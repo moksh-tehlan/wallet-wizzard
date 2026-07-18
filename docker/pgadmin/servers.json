@@ -1,0 +1,14 @@
+{
+  "Servers": {
+    "1": {
+      "Name": "WalletWizzard",
+      "Group": "Servers",
+      "Host": "postgres",
+      "Port": 5432,
+      "MaintenanceDB": "walletwizzard",
+      "Username": "walletwizzard",
+      "SSLMode": "prefer",
+      "PassFile": "/pgpass"
+    }
+  }
+}

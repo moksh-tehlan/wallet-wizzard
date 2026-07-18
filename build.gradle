@@ -1,0 +1,70 @@
+plugins {
+    id 'java'
+    id 'org.springframework.boot' version '4.1.0'
+    id 'io.spring.dependency-management' version '1.1.7'
+}
+
+group = 'com.moksh'
+version = '0.0.1-SNAPSHOT'
+description = 'walletwizzard'
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(26)
+    }
+}
+
+repositories {
+    mavenCentral()
+}
+
+ext {
+    set('springAiVersion', "2.0.0")
+    set('springCloudAwsVersion', "4.0.2")
+}
+
+dependencies {
+    // Web (needed for HTTP/SSE MCP transport)
+    implementation 'org.springframework.boot:spring-boot-starter-web'
+
+    // Core
+    implementation 'org.springframework.boot:spring-boot-starter-actuator'
+    implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+    implementation 'org.springframework.boot:spring-boot-starter-security'
+    implementation 'org.springframework.boot:spring-boot-starter-security-oauth2-resource-server'
+    implementation 'org.springframework.boot:spring-boot-starter-validation'
+
+    // MCP Server
+    implementation 'org.springframework.ai:spring-ai-starter-mcp-server-webmvc'
+
+    // AWS AppConfig — uncomment when online (Maven Central required to download)
+    // implementation "io.awspring.cloud:spring-cloud-aws-starter-appconfig:${springCloudAwsVersion}"
+
+    // Database
+    runtimeOnly 'org.postgresql:postgresql'
+    implementation 'org.springframework.boot:spring-boot-starter-flyway'  // includes FlywayAutoConfiguration (Spring Boot 4.x module)
+    runtimeOnly 'org.flywaydb:flyway-database-postgresql'
+
+    // Utilities
+    compileOnly 'org.projectlombok:lombok'
+    annotationProcessor 'org.projectlombok:lombok'
+
+    // Test
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    testImplementation 'org.springframework.boot:spring-boot-starter-security-test'
+    testImplementation 'org.testcontainers:junit-jupiter:2.0.5'
+    testImplementation 'org.testcontainers:postgresql:2.0.5'
+    testCompileOnly 'org.projectlombok:lombok'
+    testAnnotationProcessor 'org.projectlombok:lombok'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+dependencyManagement {
+    imports {
+        mavenBom "org.springframework.ai:spring-ai-bom:${springAiVersion}"
+    }
+}
+
+tasks.named('test') {
+    useJUnitPlatform()
+}

@@ -1,0 +1,100 @@
+spring:
+  application:
+    name: walletwizzard
+
+  datasource:
+    # App role — RLS is enforced on this user (not the schema owner)
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:walletwizzard}?reWriteBatchedInserts=true&ApplicationName=walletwizzard
+    username: ${DB_APP_USER:walletwizzard_app}
+    password: ${DB_APP_PASSWORD:walletwizzard_app_dev}
+    hikari:
+      pool-name: WalletWizzardPool
+      # Formula: (2 × CPU cores) + 1  — tune via env in production
+      maximum-pool-size: ${HIKARI_MAX_POOL_SIZE:10}
+      minimum-idle: ${HIKARI_MIN_IDLE:5}
+      connection-timeout: 20000   # 20s — fail fast rather than pile up requests
+      idle-timeout: 300000        # 5min
+      max-lifetime: 1200000       # 20min — must be less than DB wait_timeout
+      keepalive-time: 60000       # 1min — prevent idle connections from being dropped
+
+  jpa:
+    open-in-view: false           # never hold a DB connection open for rendering
+    show-sql: false
+    hibernate:
+      ddl-auto: validate          # Flyway owns the schema; Hibernate only validates
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: false
+        generate_statistics: false
+        jdbc:
+          batch_size: 50
+          batch_versioned_data: true
+        order_inserts: true
+        order_updates: true
+        cache:
+          use_second_level_cache: false
+
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: false
+    validate-on-migrate: true
+    out-of-order: false
+    table: flyway_schema_history
+    # Schema owner runs migrations — bypasses RLS so DDL works correctly
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:walletwizzard}
+    user: ${DB_USER:walletwizzard}
+    password: ${DB_PASSWORD:changeme}
+
+  cloud:
+    aws:
+      appconfig:
+        enabled: ${APPCONFIG_ENABLED:false}
+        application: walletwizzard
+        environment: ${APP_ENV:dev}
+        profiles:
+          - name: main-config
+      region:
+        static: ${AWS_REGION:ap-south-1}
+
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${JWT_ISSUER_URI}
+
+  ai:
+    mcp:
+      server:
+        name: walletwizzard
+        version: 0.0.1-SNAPSHOT
+        type: SYNC
+        protocol: STREAMABLE
+        capabilities:
+          tool:
+            enabled: true
+
+server:
+  port: ${SERVER_PORT:8080}
+  shutdown: graceful  # wait for in-flight requests on SIGTERM
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,flyway
+  endpoint:
+    health:
+      show-details: when_authorized
+
+logging:
+  level:
+    root: INFO
+    com.moksh.walletwizzard: INFO
+
+app:
+  oauth:
+    client-id: ${OAUTH2_CLIENT_ID}
+    cognito-domain: ${COGNITO_DOMAIN}
+    base-url: ${APP_BASE_URL:http://localhost:8080}
