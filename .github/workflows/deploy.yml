@@ -114,6 +114,18 @@ jobs:
               --env-file /opt/walletwizzard/.env \
               up -d
 
-            # Health check
-            sleep 15
-            curl -sf http://localhost:8080/actuator/health | python3 -m json.tool
+            # Health check — wait up to 60s for app to become ready
+            for i in $(seq 1 20); do
+              if curl -sf http://localhost:8080/actuator/health > /dev/null 2>&1; then
+                echo "App is healthy!"
+                curl -sf http://localhost:8080/actuator/health | python3 -m json.tool
+                break
+              fi
+              if [ "$i" -eq 20 ]; then
+                echo "App did not become healthy in 60s"
+                docker logs walletwizzard-app --tail 50 2>&1
+                exit 1
+              fi
+              echo "Waiting for app ($i/20)..."
+              sleep 3
+            done
