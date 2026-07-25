@@ -103,13 +103,12 @@ jobs:
             sudo systemctl stop walletwizzard 2>/dev/null || true
             sudo systemctl disable walletwizzard 2>/dev/null || true
 
-            # Pull new image and restart (down first to clear any leftover containers)
+            # Pull new image and restart
             docker compose -f /opt/walletwizzard/docker-compose.prod.yml \
               --env-file /opt/walletwizzard/.env pull
 
-            docker compose -f /opt/walletwizzard/docker-compose.prod.yml \
-              --env-file /opt/walletwizzard/.env \
-              down --remove-orphans 2>/dev/null || true
+            # Remove any containers with conflicting names (data is on host volume /data/postgres)
+            docker rm -f walletwizzard-postgres walletwizzard-app 2>/dev/null || true
 
             docker compose -f /opt/walletwizzard/docker-compose.prod.yml \
               --env-file /opt/walletwizzard/.env \
