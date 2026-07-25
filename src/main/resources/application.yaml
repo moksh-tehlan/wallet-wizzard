@@ -78,6 +78,7 @@ spring:
 server:
   port: ${SERVER_PORT:8080}
   shutdown: graceful  # wait for in-flight requests on SIGTERM
+  forward-headers-strategy: framework  # trust X-Forwarded-Proto from nginx so OAuth metadata URLs use https://
 
 management:
   endpoints:
@@ -87,6 +88,14 @@ management:
   endpoint:
     health:
       show-details: when_authorized
+  otlp:
+    tracing:
+      endpoint: ${SIGNOZ_OTLP_ENDPOINT:}     # e.g. https://ingest.in.signoz.cloud:443/v1/traces
+      headers:
+        signoz-ingestion-key: ${SIGNOZ_INGESTION_KEY:}
+  tracing:
+    sampling:
+      probability: 1.0
 
 logging:
   level:

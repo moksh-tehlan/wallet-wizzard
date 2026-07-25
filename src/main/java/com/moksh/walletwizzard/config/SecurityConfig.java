@@ -31,7 +31,11 @@ public class SecurityConfig {
                                 "/actuator/health",
                                 "/actuator/info",
                                 "/.well-known/oauth-authorization-server",
-                                "/oauth2/register"
+                                "/.well-known/oauth-protected-resource",
+                                "/oauth2/register",
+                                "/oauth2/authorize",
+                                "/oauth2/callback",
+                                "/oauth2/token"
                         ).permitAll()
                         .anyRequest().authenticated()
                 )

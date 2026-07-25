@@ -1,0 +1,116 @@
+name: Build & Deploy
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  id-token: write   # required for OIDC token
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      AWS_REGION: ap-south-1
+      ECR_REGISTRY: 711427856500.dkr.ecr.ap-south-1.amazonaws.com
+      ECR_REPOSITORY: walletwizzard
+      RELEASE_TAG: ${{ github.event.release.tag_name }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: temurin
+          cache: gradle
+
+      - name: Build JAR
+        run: ./gradlew bootJar -x test --no-daemon
+
+      - name: Configure AWS credentials via OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Log in to ECR
+        id: ecr-login
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build & push image to ECR
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:${{ env.RELEASE_TAG }}
+            ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Upload compose file to EC2
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ec2-user
+          key: ${{ secrets.EC2_SSH_KEY }}
+          source: docker-compose.prod.yml
+          target: /opt/walletwizzard/
+
+      - name: Deploy to EC2
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ec2-user
+          key: ${{ secrets.EC2_SSH_KEY }}
+          envs: ECR_REGISTRY,ECR_REPOSITORY,RELEASE_TAG,AWS_REGION
+          script: |
+            set -e
+
+            # Fetch app secrets from Secrets Manager (EC2 IAM role handles auth)
+            SECRET_JSON=$(aws secretsmanager get-secret-value \
+              --secret-id walletwizzard/prod \
+              --region ap-south-1 \
+              --query SecretString \
+              --output text)
+
+            # Write .env with restricted permissions
+            python3 -c "
+            import json, sys
+            d = json.loads(sys.stdin.read())
+            with open('/opt/walletwizzard/.env', 'w') as f:
+                for k, v in d.items():
+                    f.write(f'{k}={v}\n')
+            " <<< "$SECRET_JSON"
+            chmod 600 /opt/walletwizzard/.env
+
+            # Append deploy-time image vars
+            echo "DOCKER_IMAGE=${ECR_REGISTRY}/${ECR_REPOSITORY}" >> /opt/walletwizzard/.env
+            echo "IMAGE_TAG=${RELEASE_TAG}" >> /opt/walletwizzard/.env
+
+            # Log in to ECR using the EC2 IAM role
+            aws ecr get-login-password --region ${AWS_REGION} | \
+              docker login --username AWS --password-stdin ${ECR_REGISTRY}
+
+            # Stop old systemd-managed JAR on first deploy
+            sudo systemctl stop walletwizzard 2>/dev/null || true
+            sudo systemctl disable walletwizzard 2>/dev/null || true
+
+            # Pull new image and restart
+            docker compose -f /opt/walletwizzard/docker-compose.prod.yml \
+              --env-file /opt/walletwizzard/.env pull
+
+            docker compose -f /opt/walletwizzard/docker-compose.prod.yml \
+              --env-file /opt/walletwizzard/.env \
+              up -d --remove-orphans
+
+            # Health check
+            sleep 15
+            curl -sf http://localhost:8080/actuator/health | python3 -m json.tool

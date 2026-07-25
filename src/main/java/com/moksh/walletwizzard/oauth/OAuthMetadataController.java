@@ -1,6 +1,7 @@
 package com.moksh.walletwizzard.oauth;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Profile;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -12,6 +13,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.List;
 import java.util.Map;
 
+@Slf4j
 @RestController
 @RequiredArgsConstructor
 @Profile("!local")
@@ -21,11 +23,10 @@ public class OAuthMetadataController {
 
     @GetMapping("/.well-known/oauth-authorization-server")
     public Map<String, Object> metadata() {
-        String cognitoBase = "https://" + props.cognitoDomain();
         return Map.of(
                 "issuer",                                props.baseUrl(),
-                "authorization_endpoint",               cognitoBase + "/oauth2/authorize",
-                "token_endpoint",                       cognitoBase + "/oauth2/token",
+                "authorization_endpoint",               props.baseUrl() + "/oauth2/authorize",
+                "token_endpoint",                       props.baseUrl() + "/oauth2/token",
                 "registration_endpoint",                props.baseUrl() + "/oauth2/register",
                 "scopes_supported",                     List.of("openid", "email", "profile"),
                 "response_types_supported",             List.of("code"),
@@ -44,12 +45,14 @@ public class OAuthMetadataController {
     @PostMapping("/oauth2/register")
     @ResponseStatus(HttpStatus.CREATED)
     public Map<String, Object> register(@RequestBody Map<String, Object> request) {
+        Object redirectUris = request.getOrDefault("redirect_uris", List.of());
         return Map.of(
                 "client_id",                    props.clientId(),
+                "redirect_uris",                redirectUris,
                 "token_endpoint_auth_method",   "none",
                 "grant_types",                  List.of("authorization_code", "refresh_token"),
                 "response_types",               List.of("code"),
-                "scopes",                       "openid email profile"
+                "scope",                        "openid email profile"
         );
     }
 }

@@ -51,12 +51,14 @@ public class TenantFilter extends OncePerRequestFilter {
     }
 
     private String extractEmail(Jwt jwt) {
+        // ID tokens have 'email'; Cognito access tokens carry it as 'username'
         String email = jwt.getClaimAsString("email");
-        if (email == null || email.isBlank()) {
-            throw new IllegalStateException(
-                    "JWT is missing the 'email' claim. Enable the email scope in your identity provider.");
-        }
-        return email;
+        if (email != null && !email.isBlank()) return email;
+        String username = jwt.getClaimAsString("username");
+        if (username != null && !username.isBlank()) return username;
+        throw new IllegalStateException(
+                "JWT is missing both 'email' and 'username' claims. " +
+                "Ensure the email scope is requested and the user pool is configured correctly.");
     }
 
     private String extractName(Jwt jwt) {
@@ -69,6 +71,9 @@ public class TenantFilter extends OncePerRequestFilter {
         if (given != null) return given;
         if (family != null) return family;
 
-        return jwt.getClaimAsString("email").split("@")[0];
+        // Fall back to the portion before @ in the email/username
+        String email = jwt.getClaimAsString("email");
+        if (email == null) email = jwt.getClaimAsString("username");
+        return email != null ? email.split("@")[0] : "User";
     }
 }

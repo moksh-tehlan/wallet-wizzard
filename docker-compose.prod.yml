@@ -1,0 +1,57 @@
+services:
+
+  postgres:
+    image: postgres:17-alpine
+    container_name: walletwizzard-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: walletwizzard
+      POSTGRES_USER: walletwizzard
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - /data/postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U walletwizzard -d walletwizzard"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    networks:
+      - walletwizzard-net
+
+  app:
+    image: ${DOCKER_IMAGE}:${IMAGE_TAG:-latest}   # e.g. 711427856500.dkr.ecr.ap-south-1.amazonaws.com/walletwizzard:v1.0.0
+    container_name: walletwizzard-app
+    restart: unless-stopped
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: walletwizzard
+      DB_USER: walletwizzard
+      DB_APP_USER: walletwizzard_app
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_APP_PASSWORD: ${DB_APP_PASSWORD}
+      JWT_ISSUER_URI: ${JWT_ISSUER_URI}
+      OAUTH2_CLIENT_ID: ${OAUTH2_CLIENT_ID}
+      COGNITO_DOMAIN: ${COGNITO_DOMAIN}
+      APP_BASE_URL: ${APP_BASE_URL}
+      SIGNOZ_OTLP_ENDPOINT: ${SIGNOZ_OTLP_ENDPOINT:-}
+      SIGNOZ_INGESTION_KEY: ${SIGNOZ_INGESTION_KEY:-}
+    ports:
+      - "127.0.0.1:8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - walletwizzard-net
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+networks:
+  walletwizzard-net:
+    driver: bridge
