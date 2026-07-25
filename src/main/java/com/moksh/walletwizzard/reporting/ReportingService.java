@@ -5,7 +5,9 @@ import com.moksh.walletwizzard.enums.AccountType;
 import com.moksh.walletwizzard.reporting.dto.AccountBalanceDto;
 import com.moksh.walletwizzard.reporting.dto.CashFlowDto;
 import com.moksh.walletwizzard.reporting.dto.MonthlyReportDto;
+import com.moksh.walletwizzard.reporting.dto.MonthlyTrendDto;
 import com.moksh.walletwizzard.reporting.dto.NetWorthDto;
+import com.moksh.walletwizzard.reporting.dto.SpendingAverageDto;
 import com.moksh.walletwizzard.reporting.dto.SpendingByCategoryDto;
 import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
@@ -13,8 +15,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.YearMonth;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
@@ -171,6 +175,97 @@ public class ReportingService {
                 cashFlow.totalExpenses(),
                 cashFlow.netSavings(),
                 breakdown);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Spending Averages
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /**
+     * Average monthly spend per expense category over the last N months.
+     * Only months that have at least one expense entry for that category are counted
+     * in the average (avoids diluting the average with months you didn't use the category).
+     */
+    public List<SpendingAverageDto> getSpendingAverages(int months) {
+        LocalDate from = LocalDate.now().minusMonths(months).withDayOfMonth(1);
+
+        String sql = """
+                SELECT
+                    sub.account_id::text,
+                    sub.account_name,
+                    AVG(sub.monthly_total)  AS avg_spend,
+                    MAX(sub.monthly_total)  AS max_spend,
+                    MIN(sub.monthly_total)  AS min_spend,
+                    COUNT(*)                AS months_with_data
+                FROM (
+                    SELECT
+                        a.id        AS account_id,
+                        a.name      AS account_name,
+                        DATE_TRUNC('month', je.date) AS month,
+                        SUM(CASE WHEN jel.side = a.normal_balance THEN jel.amount ELSE -jel.amount END) AS monthly_total
+                    FROM journal_entry_lines jel
+                    JOIN accounts       a  ON jel.account_id       = a.id
+                    JOIN journal_entries je ON jel.journal_entry_id = je.id
+                    WHERE a.type = 'EXPENSE'
+                      AND je.date >= CAST(:from AS date)
+                    GROUP BY a.id, a.name, DATE_TRUNC('month', je.date)
+                    HAVING SUM(CASE WHEN jel.side = a.normal_balance THEN jel.amount ELSE -jel.amount END) > 0
+                ) sub
+                GROUP BY sub.account_id, sub.account_name
+                ORDER BY avg_spend DESC
+                """;
+
+        @SuppressWarnings("unchecked")
+        List<Object[]> rows = em.createNativeQuery(sql)
+                .setParameter("from", from)
+                .getResultList();
+
+        return rows.stream()
+                .map(r -> new SpendingAverageDto(
+                        UUID.fromString((String) r[0]),
+                        (String) r[1],
+                        decimal(r[2]).setScale(2, RoundingMode.HALF_UP),
+                        decimal(r[3]).setScale(2, RoundingMode.HALF_UP),
+                        decimal(r[4]).setScale(2, RoundingMode.HALF_UP),
+                        ((Number) r[5]).intValue()
+                ))
+                .toList();
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Monthly Trend
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /**
+     * Month-by-month income vs expenses for the last N complete months (most recent first).
+     * Also computes averages across all months in the range.
+     */
+    public MonthlyTrendDto getMonthlyTrend(int months) {
+        List<MonthlyTrendDto.MonthRow> rows = new ArrayList<>(months);
+        YearMonth current = YearMonth.now().minusMonths(1); // start from last complete month
+
+        for (int i = 0; i < months; i++) {
+            YearMonth ym = current.minusMonths(i);
+            CashFlowDto flow = getCashFlow(ym.atDay(1), ym.atEndOfMonth());
+            rows.add(new MonthlyTrendDto.MonthRow(
+                    ym.toString(),
+                    flow.totalIncome(),
+                    flow.totalExpenses(),
+                    flow.netSavings()
+            ));
+        }
+
+        BigDecimal avgIncome = rows.stream()
+                .map(MonthlyTrendDto.MonthRow::income)
+                .reduce(BigDecimal.ZERO, BigDecimal::add)
+                .divide(BigDecimal.valueOf(months), 2, RoundingMode.HALF_UP);
+
+        BigDecimal avgExpenses = rows.stream()
+                .map(MonthlyTrendDto.MonthRow::expenses)
+                .reduce(BigDecimal.ZERO, BigDecimal::add)
+                .divide(BigDecimal.valueOf(months), 2, RoundingMode.HALF_UP);
+
+        return new MonthlyTrendDto(months, avgIncome, avgExpenses, avgIncome.subtract(avgExpenses), rows);
     }
 
     // ─────────────────────────────────────────────────────────────────────────

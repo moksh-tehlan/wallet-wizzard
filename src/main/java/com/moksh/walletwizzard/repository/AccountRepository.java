@@ -24,6 +24,8 @@ public interface AccountRepository extends JpaRepository<Account, UUID> {
 
     Optional<Account> findByNameAndIsSystemTrueAndIsActiveTrue(String name);
 
+    Optional<Account> findByNameAndIsActiveTrue(String name);
+
     @Query(value = """
             SELECT COALESCE(SUM(
                 CASE WHEN jel.side = a.normal_balance THEN jel.amount ELSE -jel.amount END

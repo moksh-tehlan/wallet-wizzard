@@ -86,6 +86,38 @@ public class DebtTools {
     }
 
     @McpTool(
+            name = "settle_debt",
+            description = """
+                    Records a (partial or full) repayment for a debt.
+
+                    For LENT debts: call when someone pays you back (bank account is credited to you).
+                    For BORROWED debts: call when you pay someone back (money leaves your bank account).
+
+                    Partial settlements are allowed — call multiple times until the balance reaches zero.
+                    After settlement, call get_debt_summary to check the remaining outstanding balance.
+                    Balance = 0 means fully settled.
+                    """,
+            annotations = @McpTool.McpAnnotations(readOnlyHint = false, destructiveHint = false)
+    )
+    public DebtSummary settleDebt(
+            @McpArg(name = "debtId", description = "UUID of the debt record to settle", required = true)
+            String debtId,
+            @McpArg(name = "bankAccountId", description = "UUID of bank account the money moved through", required = true)
+            String bankAccountId,
+            @McpArg(name = "amount", description = "Amount being settled e.g. '2000.00'", required = true)
+            String amount,
+            @McpArg(name = "date", description = "Settlement date YYYY-MM-DD (defaults to today)", required = false)
+            String date
+    ) {
+        return debtService.settleDebt(
+                McpInputs.requireUuid(debtId, "debtId"),
+                McpInputs.requireUuid(bankAccountId, "bankAccountId"),
+                McpInputs.requireAmount(amount, "amount"),
+                McpInputs.parseDate(date, "date")
+        );
+    }
+
+    @McpTool(
             name = "get_debt_summary",
             description = "Returns the current state of a single debt including its outstanding balance.",
             annotations = @McpTool.McpAnnotations(readOnlyHint = true)

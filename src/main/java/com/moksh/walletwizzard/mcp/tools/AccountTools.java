@@ -42,7 +42,7 @@ public class AccountTools {
                       INCOME_ACCOUNT  → no parent group (flat income list)
                       EXPENSE_ACCOUNT → no parent group (flat expense list)
 
-                    Only pass parentId if you need a custom parent not covered by subType.
+                    Always provide subType for correct grouping. Omit it only for EQUITY accounts.
                     """,
             annotations = @McpTool.McpAnnotations(readOnlyHint = false, destructiveHint = false)
     )
@@ -53,8 +53,6 @@ public class AccountTools {
             String type,
             @McpArg(name = "subType", description = "BANK_ACCOUNT | CASH_AND_WALLET | RECEIVABLE | CREDIT_CARD | LOAN_PAYABLE | OTHER_ASSET | OTHER_LIABILITY | INCOME_ACCOUNT | EXPENSE_ACCOUNT", required = false)
             String subType,
-            @McpArg(name = "parentId", description = "UUID of a custom parent account — omit when using subType", required = false)
-            String parentId,
             @McpArg(name = "notes", description = "Optional notes about this account", required = false)
             String notes
     ) {
@@ -62,7 +60,7 @@ public class AccountTools {
                 name,
                 McpInputs.requireEnum(type, "type", AccountType.class),
                 McpInputs.parseEnum(subType, "subType", AccountSubType.class),
-                McpInputs.parseUuid(parentId, "parentId"),
+                null,
                 notes
         );
         var account = accountService.createAccount(request);

@@ -56,7 +56,7 @@ public class DebtService {
         AccountSubType debtSubType = request.direction() == DebtDirection.LENT
                 ? AccountSubType.RECEIVABLE : AccountSubType.OTHER_LIABILITY;
 
-        Account debtAccount = accountService.createAccount(
+        Account debtAccount = accountService.findOrCreateAccount(
                 new CreateAccountRequest(accountName, debtAccountType, debtSubType, null,
                         "Auto-created for " + request.direction().name().toLowerCase()
                         + " to " + person.getName()));
@@ -101,6 +101,46 @@ public class DebtService {
         Map<UUID, BigDecimal> balances = accountService.getBalancesForAccounts(accountIds);
 
         return records.stream().map(r -> toSummary(r, balances)).toList();
+    }
+
+    @Transactional
+    public DebtSummary settleDebt(UUID debtId, UUID bankAccountId, BigDecimal amount, LocalDate date) {
+        DebtRecord record = debtRecordRepository.findByIdWithDetails(debtId)
+                .orElseThrow(() -> new ResourceNotFoundException("Debt record", debtId));
+
+        if (amount.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new com.moksh.walletwizzard.exception.InvalidInputException(
+                    "Settlement amount must be greater than zero.");
+        }
+
+        LocalDate settleDate = date != null ? date : LocalDate.now();
+        UUID debtAccountId = record.getAccount().getId();
+
+        List<LineRequest> lines;
+        if (record.getDirection() == DebtDirection.LENT) {
+            // You lent money → receiving repayment: bank ↑, receivable ↓
+            lines = List.of(
+                    new LineRequest(bankAccountId, amount, EntrySide.DEBIT, "Repayment received"),
+                    new LineRequest(debtAccountId, amount, EntrySide.CREDIT, "Receivable reduced")
+            );
+        } else {
+            // You borrowed money → making repayment: payable ↓, bank ↓
+            lines = List.of(
+                    new LineRequest(debtAccountId, amount, EntrySide.DEBIT, "Payable reduced"),
+                    new LineRequest(bankAccountId, amount, EntrySide.CREDIT, "Repayment made")
+            );
+        }
+
+        accountingService.record(new RecordTransactionRequest(
+                settleDate,
+                "Debt settlement — " + record.getPerson().getName(),
+                EntryType.DEBT_SETTLEMENT,
+                record.getId(),
+                lines
+        ));
+
+        log.info("Settled {}  debt {} amount={}", record.getDirection(), debtId, amount);
+        return getDebtSummary(debtId);
     }
 
     public DebtSummary getDebtSummary(UUID debtId) {

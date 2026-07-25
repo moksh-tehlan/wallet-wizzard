@@ -6,6 +6,7 @@ import com.moksh.walletwizzard.entity.Account;
 import com.moksh.walletwizzard.entity.User;
 import com.moksh.walletwizzard.enums.AccountSubType;
 import com.moksh.walletwizzard.enums.AccountType;
+import com.moksh.walletwizzard.exception.InvalidInputException;
 import com.moksh.walletwizzard.exception.ResourceNotFoundException;
 import com.moksh.walletwizzard.repository.AccountRepository;
 import jakarta.persistence.EntityManager;
@@ -34,7 +35,18 @@ public class AccountService {
     private final EntityManager entityManager;
 
     @Transactional
+    public Account findOrCreateAccount(CreateAccountRequest request) {
+        return accountRepository.findByNameAndIsActiveTrue(request.name())
+                .orElseGet(() -> createAccount(request));
+    }
+
+    @Transactional
     public Account createAccount(@Valid CreateAccountRequest request) {
+        if (accountRepository.findByNameAndIsActiveTrue(request.name()).isPresent()) {
+            throw new InvalidInputException(
+                    "An account named '" + request.name() + "' already exists. "
+                    + "Use list_accounts to find it, or choose a different name.");
+        }
         User userRef = entityManager.getReference(User.class, TenantContext.getCurrentUser());
 
         Account account = Account.builder()
