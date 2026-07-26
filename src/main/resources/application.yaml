@@ -95,6 +95,12 @@ management:
           endpoint: ${SIGNOZ_OTLP_ENDPOINT:}
           headers:
             signoz-ingestion-key: ${SIGNOZ_INGESTION_KEY:}
+    logging:
+      export:
+        otlp:
+          endpoint: ${SIGNOZ_OTLP_LOGS_ENDPOINT:https://ingest.in2.signoz.cloud:443/v1/logs}
+          headers:
+            signoz-ingestion-key: ${SIGNOZ_INGESTION_KEY:}
   tracing:
     sampling:
       probability: 1.0
