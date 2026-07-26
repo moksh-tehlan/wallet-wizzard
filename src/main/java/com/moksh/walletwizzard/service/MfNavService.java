@@ -17,11 +17,7 @@ public class MfNavService {
 
     private static final String BASE_URL = "https://api.mfapi.in";
 
-    private final RestClient restClient;
-
-    public MfNavService(RestClient.Builder builder) {
-        this.restClient = builder.baseUrl(BASE_URL).build();
-    }
+    private final RestClient restClient = RestClient.create(BASE_URL);
 
     /** Returns the latest NAV for the given AMFI scheme code. */
     public BigDecimal getLatestNav(String schemeCode) {
