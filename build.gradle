@@ -48,7 +48,7 @@ dependencies {
     // Observability — Spring Boot 4.x OTel starter (includes autoconfiguration + OTLP exporter)
     implementation 'org.springframework.boot:spring-boot-starter-opentelemetry'
     // Bridges Logback → OTel Log SDK so logs are exported via OTLP alongside traces
-    implementation 'io.opentelemetry.instrumentation:opentelemetry-logback-appender-1.0'
+    implementation 'io.opentelemetry.instrumentation:opentelemetry-logback-appender-1.0:2.16.0-alpha'
 
     // Utilities
     compileOnly 'org.projectlombok:lombok'
