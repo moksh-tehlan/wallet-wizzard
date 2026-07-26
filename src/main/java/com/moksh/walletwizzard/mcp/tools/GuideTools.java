@@ -31,6 +31,7 @@ public class GuideTools {
                   People:            add_person, list_people, update_person
                   Person Balance:    get_person_balance
                   Recurring:         add_recurring_transaction, record_recurring_payment, list_recurring_transactions, update_recurring_transaction_status, get_upcoming_bills
+                  Investments:       search_mutual_fund, add_investment, record_investment_contribution, refresh_investment_values, get_portfolio, close_investment
                   Expense Groups:    create_expense_group, add_group_member, add_group_expense, list_groups, list_group_expenses, get_group_balance, settle_group_member
 
                 ## Accounts
@@ -159,6 +160,37 @@ public class GuideTools {
 
                 If someone else paid (not you): pass paidByPersonId, omit expenseAccountId + bankAccountId.
                 Your share is tracked as what you owe that person.
+
+                ## Investments
+
+                Tracks MF, EPF, FD, and RD. Market values are computed/fetched live.
+                Investment gains appear separately in get_net_worth as investmentGains.
+
+                Flow — Mutual Fund:
+                  1. search_mutual_fund(query="Axis Bluechip") → pick schemeCode
+                  2. add_investment(type=MUTUAL_FUND, schemeCode, units, amount, bankAccountId)
+                     → live NAV fetched immediately, currentValue = units × NAV
+                  3. refresh_investment_values() anytime for updated NAV
+                  4. record_investment_contribution(investmentId, amount, unitsAdded) for SIP
+                  5. close_investment(investmentId, bankAccountId) on redemption
+
+                Flow — FD:
+                  1. add_investment(type=FD, amount=principal, interestRate=0.07, maturityDate, bankAccountId)
+                  2. refresh_investment_values() → value recomputed using quarterly compounding
+                  3. close_investment(investmentId, bankAccountId) on maturity
+
+                Flow — RD:
+                  1. add_investment(type=RD, amount=firstInstallment, interestRate, monthlyContribution, maturityDate, bankAccountId)
+                  2. record_investment_contribution(investmentId, amount, bankAccountId) each month
+                  3. close_investment(investmentId, bankAccountId) on maturity
+
+                Flow — EPF:
+                  1. add_investment(type=EPF, amount=currentBalance, interestRate=0.0825)
+                     bankAccountId optional — omit for existing EPF balance (no bank debit)
+                  2. record_investment_contribution(investmentId, amount) each month for deductions
+                  3. refresh_investment_values() → value recomputed with compound interest
+
+                interestRate: decimal — 0.07 = 7%, 0.0825 = 8.25% (EPF default)
 
                 ## Spending Baseline & Trends
 

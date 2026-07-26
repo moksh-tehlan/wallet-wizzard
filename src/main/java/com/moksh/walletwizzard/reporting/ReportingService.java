@@ -177,7 +177,16 @@ public class ReportingService {
                         .getSingleResult()
         );
 
-        return NetWorthDto.of(effectiveDate, decimal(row[0]), decimal(row[1]), sharedLoanReceivables);
+        // Investment gains: market value appreciation above cost basis (can be negative)
+        String investmentGainsSql = """
+                SELECT COALESCE(SUM(current_value - invested_amount), 0)
+                FROM investments
+                """;
+        BigDecimal investmentGains = decimal(
+                em.createNativeQuery(investmentGainsSql).getSingleResult()
+        );
+
+        return NetWorthDto.of(effectiveDate, decimal(row[0]), decimal(row[1]), sharedLoanReceivables, investmentGains);
     }
 
     // ─────────────────────────────────────────────────────────────────────────

@@ -62,9 +62,11 @@ public class ReportingTools {
     @McpTool(
             name = "get_net_worth",
             description = """
-                    Returns total assets, total liabilities, sharedLoanReceivables, and net worth.
-                    netWorth = totalAssets − totalLiabilities + sharedLoanReceivables.
-                    sharedLoanReceivables = remaining loan balance × co-borrower share% (their portion of outstanding debt they owe you).
+                    Returns total assets, liabilities, and net worth.
+                    netWorth = totalAssets − totalLiabilities + sharedLoanReceivables + investmentGains.
+                    sharedLoanReceivables = remaining loan balance × co-borrower share%.
+                    investmentGains = SUM(currentValue − investedAmount) across all investments (can be negative).
+                    Call refresh_investment_values first for fresh MF NAVs.
                     Pass asOfDate for a historical snapshot; omit for current net worth.
                     """,
             annotations = @McpTool.McpAnnotations(readOnlyHint = true)

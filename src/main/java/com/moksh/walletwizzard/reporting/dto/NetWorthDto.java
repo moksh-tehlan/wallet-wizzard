@@ -7,21 +7,23 @@ public record NetWorthDto(
         LocalDate asOfDate,
         BigDecimal totalAssets,
         BigDecimal totalLiabilities,
-        /**
-         * Co-borrower share of the current outstanding loan balance for all TAKEN shared loans.
-         * = remaining principal on each loan × participant sharePercent.
-         * Offsets the portion of your loan liabilities that co-borrowers are responsible for.
-         */
+        /** Co-borrower share of outstanding loan balance (offsets your liability). */
         BigDecimal sharedLoanReceivables,
-        BigDecimal netWorth  // totalAssets − totalLiabilities + sharedLoanReceivables
+        /**
+         * Investment market value gains: SUM(currentValue − investedAmount) across all investments.
+         * Negative when portfolio is in loss. Added on top of account-based assets.
+         */
+        BigDecimal investmentGains,
+        BigDecimal netWorth  // totalAssets − totalLiabilities + sharedLoanReceivables + investmentGains
 ) {
     public static NetWorthDto of(LocalDate asOfDate,
                                  BigDecimal assets,
                                  BigDecimal liabilities,
-                                 BigDecimal sharedLoanReceivables) {
+                                 BigDecimal sharedLoanReceivables,
+                                 BigDecimal investmentGains) {
         return new NetWorthDto(
-                asOfDate, assets, liabilities, sharedLoanReceivables,
-                assets.subtract(liabilities).add(sharedLoanReceivables)
+                asOfDate, assets, liabilities, sharedLoanReceivables, investmentGains,
+                assets.subtract(liabilities).add(sharedLoanReceivables).add(investmentGains)
         );
     }
 }
