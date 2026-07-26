@@ -64,7 +64,7 @@ public class ReportingTools {
             description = """
                     Returns total assets, total liabilities, sharedLoanReceivables, and net worth.
                     netWorth = totalAssets − totalLiabilities + sharedLoanReceivables.
-                    sharedLoanReceivables = sum of paid EMIs × co-borrower share% (what co-borrowers owe you).
+                    sharedLoanReceivables = remaining loan balance × co-borrower share% (their portion of outstanding debt they owe you).
                     Pass asOfDate for a historical snapshot; omit for current net worth.
                     """,
             annotations = @McpTool.McpAnnotations(readOnlyHint = true)

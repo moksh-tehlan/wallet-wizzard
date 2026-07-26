@@ -8,8 +8,9 @@ public record NetWorthDto(
         BigDecimal totalAssets,
         BigDecimal totalLiabilities,
         /**
-         * Sum of PAID installment amounts × co-borrower share% for all shared loans.
-         * This offsets the portion of your loan liabilities that co-borrowers owe back to you.
+         * Co-borrower share of the current outstanding loan balance for all TAKEN shared loans.
+         * = remaining principal on each loan × participant sharePercent.
+         * Offsets the portion of your loan liabilities that co-borrowers are responsible for.
          */
         BigDecimal sharedLoanReceivables,
         BigDecimal netWorth  // totalAssets − totalLiabilities + sharedLoanReceivables

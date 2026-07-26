@@ -151,16 +151,24 @@ public class ReportingService {
                 .setParameter("asOfDate", effectiveDate)
                 .getSingleResult();
 
-        // Co-borrower receivables: for TAKEN loans, sum what each participant owes you
-        // (their share of every EMI you've already paid on their behalf).
+        // Co-borrower receivables: for TAKEN loans, each participant owes their share
+        // of the *current outstanding loan balance* (remaining principal on the account).
         String participantSql = """
-                SELECT COALESCE(SUM(li.total_amount * lp.share_percent / 100.0), 0)
+                SELECT COALESCE(SUM(bal.outstanding * lp.share_percent / 100.0), 0)
                 FROM loan_participants lp
-                JOIN loan_installments li ON li.loan_id = lp.loan_id
-                JOIN loans             l  ON l.id       = lp.loan_id
-                WHERE li.status     = 'PAID'
-                  AND l.direction   = 'TAKEN'
-                  AND li.paid_date <= CAST(:asOfDate AS date)
+                JOIN loans l ON l.id = lp.loan_id
+                JOIN (
+                    SELECT
+                        jel.account_id,
+                        SUM(CASE WHEN jel.side = a.normal_balance
+                                 THEN jel.amount ELSE -jel.amount END) AS outstanding
+                    FROM journal_entry_lines jel
+                    JOIN accounts       a  ON jel.account_id       = a.id
+                    JOIN journal_entries je ON jel.journal_entry_id = je.id
+                    WHERE je.date <= CAST(:asOfDate AS date)
+                    GROUP BY jel.account_id
+                ) bal ON bal.account_id = l.account_id
+                WHERE l.direction = 'TAKEN'
                 """;
 
         BigDecimal sharedLoanReceivables = decimal(
