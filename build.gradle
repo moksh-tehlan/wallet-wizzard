@@ -45,9 +45,8 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-flyway'  // includes FlywayAutoConfiguration (Spring Boot 4.x module)
     runtimeOnly 'org.flywaydb:flyway-database-postgresql'
 
-    // Observability — traces to SigNoz via OTLP
-    implementation 'io.micrometer:micrometer-tracing-bridge-otel'
-    implementation 'io.opentelemetry:opentelemetry-exporter-otlp'
+    // Observability — Spring Boot 4.x OTel starter (includes autoconfiguration + OTLP exporter)
+    implementation 'org.springframework.boot:spring-boot-starter-opentelemetry'
 
     // Utilities
     compileOnly 'org.projectlombok:lombok'
