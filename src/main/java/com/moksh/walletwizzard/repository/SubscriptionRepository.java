@@ -16,7 +16,7 @@ public interface SubscriptionRepository extends JpaRepository<Subscription, UUID
     @Query("""
             SELECT s FROM Subscription s
             LEFT JOIN FETCH s.paymentAccount
-            LEFT JOIN FETCH s.expenseAccount
+            LEFT JOIN FETCH s.categoryAccount
             WHERE s.status = :status
             ORDER BY s.name
             """)
@@ -25,16 +25,16 @@ public interface SubscriptionRepository extends JpaRepository<Subscription, UUID
     @Query("""
             SELECT s FROM Subscription s
             LEFT JOIN FETCH s.paymentAccount
-            LEFT JOIN FETCH s.expenseAccount
+            LEFT JOIN FETCH s.categoryAccount
             ORDER BY s.name
             """)
     List<Subscription> findAllWithAccounts();
 
-    /** Active subscriptions due within the next N days, ordered by due date. */
+    /** Active recurring transactions due within the next N days, ordered by due date. */
     @Query("""
             SELECT s FROM Subscription s
             LEFT JOIN FETCH s.paymentAccount
-            LEFT JOIN FETCH s.expenseAccount
+            LEFT JOIN FETCH s.categoryAccount
             WHERE s.status = 'ACTIVE'
               AND s.nextBillingDate IS NOT NULL
               AND s.nextBillingDate <= :cutoff
@@ -45,7 +45,7 @@ public interface SubscriptionRepository extends JpaRepository<Subscription, UUID
     @Query("""
             SELECT s FROM Subscription s
             LEFT JOIN FETCH s.paymentAccount
-            LEFT JOIN FETCH s.expenseAccount
+            LEFT JOIN FETCH s.categoryAccount
             WHERE s.id = :id
             """)
     Optional<Subscription> findByIdWithAccounts(@Param("id") UUID id);

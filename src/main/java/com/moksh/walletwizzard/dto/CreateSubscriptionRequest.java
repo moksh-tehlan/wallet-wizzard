@@ -1,6 +1,8 @@
 package com.moksh.walletwizzard.dto;
 
 import com.moksh.walletwizzard.enums.BillingCycle;
+import com.moksh.walletwizzard.enums.RecurringSide;
+import com.moksh.walletwizzard.enums.ScheduleType;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -15,11 +17,17 @@ public record CreateSubscriptionRequest(
         @NotNull BillingCycle billingCycle,
         LocalDate nextBillingDate,
 
-        /** Bank or credit card account charged for this subscription. */
+        /** DEBIT = outgoing (bill/expense), CREDIT = incoming (salary/rent received). */
+        @NotNull RecurringSide side,
+
+        /** How to compute the actual due date within each billing period. */
+        @NotNull ScheduleType scheduleType,
+
+        /** Bank account or credit card involved (pays out for DEBIT, receives for CREDIT). */
         @NotNull UUID paymentAccountId,
 
-        /** Expense category (e.g. Subscriptions, Entertainment). */
-        @NotNull UUID expenseAccountId,
+        /** Expense account for DEBIT, income account for CREDIT. */
+        @NotNull UUID categoryAccountId,
 
         String notes
 ) {}

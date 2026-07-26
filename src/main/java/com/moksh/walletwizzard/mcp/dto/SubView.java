@@ -5,5 +5,7 @@ public record SubView(
         String name,
         String amount,
         String billingCycle,
+        String side,
+        String scheduleType,
         String nextBillingDate
 ) {}

@@ -1,6 +1,8 @@
 package com.moksh.walletwizzard.entity;
 
 import com.moksh.walletwizzard.enums.BillingCycle;
+import com.moksh.walletwizzard.enums.RecurringSide;
+import com.moksh.walletwizzard.enums.ScheduleType;
 import com.moksh.walletwizzard.enums.SubscriptionStatus;
 import jakarta.persistence.*;
 import lombok.*;
@@ -45,10 +47,21 @@ public class Subscription extends Auditable {
     @JoinColumn(name = "payment_account_id")
     private Account paymentAccount;
 
-    /** Expense category for this subscription (e.g. Subscriptions, Entertainment). */
+    /** Expense account (DEBIT side) or income account (CREDIT side). */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "expense_account_id")
-    private Account expenseAccount;
+    private Account categoryAccount;
+
+    /** DEBIT = outgoing bill; CREDIT = incoming recurring income. */
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    @Builder.Default
+    private RecurringSide side = RecurringSide.DEBIT;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    @Builder.Default
+    private ScheduleType scheduleType = ScheduleType.FIXED_DAY;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)

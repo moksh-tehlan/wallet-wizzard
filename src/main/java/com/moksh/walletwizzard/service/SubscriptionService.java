@@ -9,6 +9,7 @@ import com.moksh.walletwizzard.entity.Subscription;
 import com.moksh.walletwizzard.entity.User;
 import com.moksh.walletwizzard.enums.EntrySide;
 import com.moksh.walletwizzard.enums.EntryType;
+import com.moksh.walletwizzard.enums.RecurringSide;
 import com.moksh.walletwizzard.enums.SubscriptionStatus;
 import com.moksh.walletwizzard.exception.ResourceNotFoundException;
 import com.moksh.walletwizzard.repository.SubscriptionRepository;
@@ -39,7 +40,7 @@ public class SubscriptionService {
     public Subscription createSubscription(@Valid CreateSubscriptionRequest request) {
         User userRef = entityManager.getReference(User.class, TenantContext.getCurrentUser());
         Account paymentRef = entityManager.getReference(Account.class, request.paymentAccountId());
-        Account expenseRef = entityManager.getReference(Account.class, request.expenseAccountId());
+        Account categoryRef = entityManager.getReference(Account.class, request.categoryAccountId());
 
         Subscription sub = Subscription.builder()
                 .user(userRef)
@@ -47,12 +48,14 @@ public class SubscriptionService {
                 .amount(request.amount())
                 .billingCycle(request.billingCycle())
                 .nextBillingDate(request.nextBillingDate())
+                .side(request.side())
+                .scheduleType(request.scheduleType())
                 .paymentAccount(paymentRef)
-                .expenseAccount(expenseRef)
+                .categoryAccount(categoryRef)
                 .notes(request.notes())
                 .build();
 
-        log.info("Creating subscription '{}'", request.name());
+        log.info("Creating recurring transaction '{}' side={} schedule={}", request.name(), request.side(), request.scheduleType());
         return subscriptionRepository.save(sub);
     }
 
@@ -63,29 +66,39 @@ public class SubscriptionService {
 
         if (sub.getStatus() != SubscriptionStatus.ACTIVE) {
             throw new IllegalStateException(
-                    "Cannot record payment for a " + sub.getStatus() + " subscription.");
+                    "Cannot record payment for a " + sub.getStatus() + " recurring transaction.");
         }
-        if (sub.getPaymentAccount() == null || sub.getExpenseAccount() == null) {
+        if (sub.getPaymentAccount() == null || sub.getCategoryAccount() == null) {
             throw new IllegalStateException(
-                    "Subscription '" + sub.getName() + "' has no payment or expense account configured.");
+                    "Recurring transaction '" + sub.getName() + "' has no payment or category account configured.");
         }
 
-        var lines = List.of(
-                new LineRequest(sub.getExpenseAccount().getId(), sub.getAmount(), EntrySide.DEBIT, sub.getName()),
-                new LineRequest(sub.getPaymentAccount().getId(), sub.getAmount(), EntrySide.CREDIT, null)
-        );
+        List<LineRequest> lines;
+        if (sub.getSide() == RecurringSide.DEBIT) {
+            // Outgoing: expense debited, payment account credited
+            lines = List.of(
+                    new LineRequest(sub.getCategoryAccount().getId(), sub.getAmount(), EntrySide.DEBIT, sub.getName()),
+                    new LineRequest(sub.getPaymentAccount().getId(), sub.getAmount(), EntrySide.CREDIT, null)
+            );
+        } else {
+            // Incoming: payment account debited (money arrives), income account credited
+            lines = List.of(
+                    new LineRequest(sub.getPaymentAccount().getId(), sub.getAmount(), EntrySide.DEBIT, null),
+                    new LineRequest(sub.getCategoryAccount().getId(), sub.getAmount(), EntrySide.CREDIT, sub.getName())
+            );
+        }
 
         accountingService.record(new RecordTransactionRequest(
                 paymentDate,
-                "Subscription — " + sub.getName(),
+                "Recurring — " + sub.getName(),
                 EntryType.SUBSCRIPTION,
                 sub.getId(),
                 lines));
 
-        LocalDate nextDate = sub.getBillingCycle().advance(
-                sub.getNextBillingDate() != null ? sub.getNextBillingDate() : paymentDate);
+        LocalDate base = sub.getNextBillingDate() != null ? sub.getNextBillingDate() : paymentDate;
+        LocalDate nextDate = sub.getScheduleType().applyTo(sub.getBillingCycle().advance(base));
         sub.setNextBillingDate(nextDate);
-        log.info("Recorded payment for subscription '{}', next billing: {}", sub.getName(), nextDate);
+        log.info("Recorded recurring payment for '{}', next date: {}", sub.getName(), nextDate);
     }
 
     public List<Subscription> listSubscriptions(SubscriptionStatus status) {
@@ -104,7 +117,7 @@ public class SubscriptionService {
     public Subscription updateStatus(UUID id, SubscriptionStatus status) {
         Subscription sub = subscriptionRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Subscription", id));
-        log.info("Updating subscription {} status to {}", id, status);
+        log.info("Updating recurring transaction {} status to {}", id, status);
         sub.setStatus(status);
         return sub;
     }

@@ -30,7 +30,7 @@ public class GuideTools {
                   Upcoming:          get_upcoming_loan_payments, get_upcoming_bills
                   People:            add_person, list_people, update_person
                   Person Balance:    get_person_balance
-                  Subscriptions:     add_subscription, record_subscription_payment, list_subscriptions, update_subscription_status
+                  Recurring:         add_recurring_transaction, record_recurring_payment, list_recurring_transactions, update_recurring_transaction_status, get_upcoming_bills
                   Expense Groups:    create_expense_group, add_group_member, add_group_expense, list_groups, list_group_expenses, get_group_balance, settle_group_member
 
                 ## Accounts
@@ -98,10 +98,29 @@ public class GuideTools {
                 paidByUser = PAID installment totals × share%. This is what they owe you.
                 To receive repayment, settle it via add_debt / settle_debt.
 
+                ## Recurring Transactions
+
+                Handles both outgoing bills (Netflix, rent, EMI) and incoming income (salary, dividend, rental income).
+
+                Flow:
+                  1. add_recurring_transaction(name, amount, billingCycle, side, scheduleType, paymentAccountId, categoryAccountId)
+                  2. record_recurring_payment(recurringId) each cycle → posts journal entry, advances next date
+                  3. list_recurring_transactions(status=ACTIVE) to see all
+                  4. update_recurring_transaction_status(recurringId, status=PAUSED/CANCELLED) to pause or cancel
+
+                side:
+                  DEBIT  → money goes out (bills, subscriptions) — DR categoryAccount (expense), CR paymentAccount
+                  CREDIT → money comes in (salary, rent received) — DR paymentAccount, CR categoryAccount (income)
+
+                scheduleType:
+                  FIXED_DAY    → same calendar day each cycle (default)
+                  LAST_DAY     → last calendar day of the month
+                  LAST_WEEKDAY → last Monday–Friday of the month (e.g. salary paid last working day)
+
                 ## Upcoming Payments
 
                   get_upcoming_loan_payments(days=30) → DUE + SCHEDULED installments
-                  get_upcoming_bills(days=30)          → subscription due dates
+                  get_upcoming_bills(days=30)          → recurring transaction due dates (both DEBIT and CREDIT)
 
                 ## Input Rules
 
