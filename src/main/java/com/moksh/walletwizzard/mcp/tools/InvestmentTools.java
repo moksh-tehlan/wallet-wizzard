@@ -167,12 +167,12 @@ public class InvestmentTools {
         BigDecimal totalValue = investments.stream().map(Investment::getCurrentValue).reduce(BigDecimal.ZERO, BigDecimal::add);
         BigDecimal totalGain = totalValue.subtract(totalInvested);
 
-        List<Map<String, Object>> rows = investments.stream().map(inv -> {
+        List<Map<String, String>> rows = investments.stream().map(inv -> {
             BigDecimal gain = inv.getCurrentValue().subtract(inv.getInvestedAmount());
             BigDecimal gainPct = inv.getInvestedAmount().compareTo(BigDecimal.ZERO) > 0
                     ? gain.divide(inv.getInvestedAmount(), 4, RoundingMode.HALF_UP).multiply(BigDecimal.valueOf(100))
                     : BigDecimal.ZERO;
-            return (Map<String, Object>) Map.of(
+            return Map.of(
                     "id", inv.getId().toString(),
                     "name", inv.getName(),
                     "type", inv.getType().name(),
@@ -184,14 +184,13 @@ public class InvestmentTools {
             );
         }).toList();
 
-        return objectMapper.writeValueAsString(Map.of(
-                "summary", Map.of(
-                        "totalInvested", totalInvested.toPlainString(),
-                        "totalValue", totalValue.toPlainString(),
-                        "totalGain", totalGain.toPlainString()
-                ),
-                "investments", rows
-        ));
+        java.util.LinkedHashMap<String, Object> result = new java.util.LinkedHashMap<>();
+        result.put("summary", Map.of(
+                "totalInvested", totalInvested.toPlainString(),
+                "totalValue", totalValue.toPlainString(),
+                "totalGain", totalGain.toPlainString()));
+        result.put("investments", rows);
+        return objectMapper.writeValueAsString(result);
     }
 
     @McpTool(
