@@ -151,7 +151,25 @@ public class ReportingService {
                 .setParameter("asOfDate", effectiveDate)
                 .getSingleResult();
 
-        return NetWorthDto.of(effectiveDate, decimal(row[0]), decimal(row[1]));
+        // Co-borrower receivables: for TAKEN loans, sum what each participant owes you
+        // (their share of every EMI you've already paid on their behalf).
+        String participantSql = """
+                SELECT COALESCE(SUM(li.total_amount * lp.share_percent / 100.0), 0)
+                FROM loan_participants lp
+                JOIN loan_installments li ON li.loan_id = lp.loan_id
+                JOIN loans             l  ON l.id       = lp.loan_id
+                WHERE li.status     = 'PAID'
+                  AND l.direction   = 'TAKEN'
+                  AND li.paid_date <= CAST(:asOfDate AS date)
+                """;
+
+        BigDecimal sharedLoanReceivables = decimal(
+                em.createNativeQuery(participantSql)
+                        .setParameter("asOfDate", effectiveDate)
+                        .getSingleResult()
+        );
+
+        return NetWorthDto.of(effectiveDate, decimal(row[0]), decimal(row[1]), sharedLoanReceivables);
     }
 
     // ─────────────────────────────────────────────────────────────────────────
