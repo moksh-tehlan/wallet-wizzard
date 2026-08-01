@@ -5,17 +5,22 @@ import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
+import org.springframework.security.authorization.AuthorizationDecision;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.util.matcher.IpAddressMatcher;
 
 @Configuration
 @EnableWebSecurity
 @RequiredArgsConstructor
 public class SecurityConfig {
+
+    private static final IpAddressMatcher LOCALHOST_V4 = new IpAddressMatcher("127.0.0.1");
+    private static final IpAddressMatcher LOCALHOST_V6 = new IpAddressMatcher("::1");
 
     private final TenantFilter tenantFilter;
 
@@ -27,8 +32,12 @@ public class SecurityConfig {
                         session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .csrf(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(auth -> auth
+                        // GET / is the nginx upstream health check — localhost only
+                        .requestMatchers("GET", "/")
+                            .access((a, ctx) -> new AuthorizationDecision(
+                                LOCALHOST_V4.matches(ctx.getRequest()) ||
+                                LOCALHOST_V6.matches(ctx.getRequest())))
                         .requestMatchers(
-                                "/",
                                 "/actuator/health",
                                 "/actuator/info",
                                 "/.well-known/oauth-authorization-server",
