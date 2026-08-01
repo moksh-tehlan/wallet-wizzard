@@ -132,6 +132,9 @@ public class ReportingService {
     public NetWorthDto getNetWorth(LocalDate asOfDate) {
         LocalDate effectiveDate = asOfDate != null ? asOfDate : LocalDate.now();
 
+        // Investment accounts are excluded here; their cost basis is added separately
+        // from investments.invested_amount so that unfunded (pre-existing) investments
+        // are properly counted without relying on a self-cancelling journal entry.
         String sql = """
                 SELECT
                     COALESCE(SUM(CASE WHEN a.type = 'ASSET'
@@ -145,6 +148,7 @@ public class ReportingService {
                 JOIN journal_entries je ON jel.journal_entry_id = je.id
                 WHERE a.type IN ('ASSET', 'LIABILITY')
                   AND je.date <= CAST(:asOfDate AS date)
+                  AND a.id NOT IN (SELECT account_id FROM investments)
                 """;
 
         Object[] row = (Object[]) em.createNativeQuery(sql)
@@ -177,16 +181,20 @@ public class ReportingService {
                         .getSingleResult()
         );
 
-        // Investment gains: market value appreciation above cost basis (can be negative)
-        String investmentGainsSql = """
-                SELECT COALESCE(SUM(current_value - invested_amount), 0)
+        // Pull invested_amount (cost basis) and market gains from the investments table.
+        // invested_amount is added to totalAssets; gains are shown separately.
+        String investmentSql = """
+                SELECT
+                    COALESCE(SUM(invested_amount), 0)              AS total_invested,
+                    COALESCE(SUM(current_value - invested_amount), 0) AS total_gains
                 FROM investments
                 """;
-        BigDecimal investmentGains = decimal(
-                em.createNativeQuery(investmentGainsSql).getSingleResult()
-        );
+        Object[] invRow = (Object[]) em.createNativeQuery(investmentSql).getSingleResult();
+        BigDecimal totalInvested  = decimal(invRow[0]);
+        BigDecimal investmentGains = decimal(invRow[1]);
 
-        return NetWorthDto.of(effectiveDate, decimal(row[0]), decimal(row[1]), sharedLoanReceivables, investmentGains);
+        BigDecimal totalAssets = decimal(row[0]).add(totalInvested);
+        return NetWorthDto.of(effectiveDate, totalAssets, decimal(row[1]), sharedLoanReceivables, investmentGains);
     }
 
     // ─────────────────────────────────────────────────────────────────────────

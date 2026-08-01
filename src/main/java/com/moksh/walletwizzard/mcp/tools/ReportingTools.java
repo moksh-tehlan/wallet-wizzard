@@ -64,6 +64,7 @@ public class ReportingTools {
             description = """
                     Returns total assets, liabilities, and net worth.
                     netWorth = totalAssets − totalLiabilities + sharedLoanReceivables + investmentGains.
+                    totalAssets includes bank/cash balances PLUS the invested cost basis of all investments.
                     sharedLoanReceivables = remaining loan balance × co-borrower share%.
                     investmentGains = SUM(currentValue − investedAmount) across all investments (can be negative).
                     Call refresh_investment_values first for fresh MF NAVs.
