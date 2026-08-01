@@ -5,6 +5,7 @@ import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.authorization.AuthorizationDecision;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
@@ -33,7 +34,7 @@ public class SecurityConfig {
                 .csrf(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(auth -> auth
                         // GET / is the nginx upstream health check — localhost only
-                        .requestMatchers("GET", "/")
+                        .requestMatchers(HttpMethod.GET, "/")
                             .access((a, ctx) -> new AuthorizationDecision(
                                 LOCALHOST_V4.matches(ctx.getRequest()) ||
                                 LOCALHOST_V6.matches(ctx.getRequest())))
