@@ -8,6 +8,7 @@ import com.moksh.walletwizzard.entity.Account;
 import com.moksh.walletwizzard.entity.JournalEntry;
 import com.moksh.walletwizzard.entity.JournalEntryLine;
 import com.moksh.walletwizzard.entity.User;
+import com.moksh.walletwizzard.enums.EntryType;
 import com.moksh.walletwizzard.enums.EntrySide;
 import com.moksh.walletwizzard.exception.DuplicateReferenceException;
 import com.moksh.walletwizzard.exception.ResourceNotFoundException;
@@ -23,6 +24,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.validation.annotation.Validated;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
@@ -82,6 +84,25 @@ public class AccountingService {
 
     public List<JournalEntry> getByReference(UUID referenceId) {
         return journalEntryRepository.findByReferenceIdWithLines(referenceId);
+    }
+
+    @Transactional
+    public JournalEntry voidEntry(UUID entryId) {
+        JournalEntry original = getById(entryId);
+        List<LineRequest> reversed = original.getLines().stream()
+                .map(l -> new LineRequest(
+                        l.getAccount().getId(),
+                        l.getAmount(),
+                        l.getSide() == EntrySide.DEBIT ? EntrySide.CREDIT : EntrySide.DEBIT,
+                        l.getMemo() != null ? "Void: " + l.getMemo() : null))
+                .toList();
+        log.info("Voiding journal entry '{}' ({})", original.getDescription(), entryId);
+        return record(new RecordTransactionRequest(
+                LocalDate.now(),
+                "VOID — " + original.getDescription(),
+                EntryType.ADJUSTMENT,
+                null,
+                reversed));
     }
 
     // ── Private helpers ──────────────────────────────────────────────────────

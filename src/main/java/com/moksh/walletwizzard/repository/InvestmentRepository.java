@@ -36,4 +36,13 @@ public interface InvestmentRepository extends JpaRepository<Investment, UUID> {
               AND i.monthlyContribution IS NOT NULL
             """)
     List<Investment> findDueContributions(LocalDate today);
+
+    @Query("""
+            SELECT i FROM Investment i
+            LEFT JOIN FETCH i.account
+            WHERE i.maturityDate IS NOT NULL
+              AND i.maturityDate <= :cutoff
+            ORDER BY i.maturityDate
+            """)
+    List<Investment> findUpcomingMaturities(LocalDate cutoff);
 }

@@ -126,4 +126,26 @@ public class TransactionTools {
                 ))
                 .toList());
     }
+
+    @McpTool(
+            name = "void_transaction",
+            description = """
+                    Corrects a wrong transaction by creating a reversal (all debits/credits flipped).
+                    The original entry is NOT deleted — both entries remain for the audit trail,
+                    and they cancel each other out in all balances and reports.
+
+                    Use get_transactions to find the journalEntryId of the wrong entry.
+                    After voiding, re-record the correct transaction separately.
+                    """,
+            annotations = @McpTool.McpAnnotations(readOnlyHint = false, destructiveHint = false)
+    )
+    public String voidTransaction(
+            @McpArg(name = "journalEntryId", description = "UUID of the journal entry to void", required = true)
+            String journalEntryId
+    ) {
+        JournalEntry reversal = accountingService.voidEntry(
+                McpInputs.requireUuid(journalEntryId, "journalEntryId"));
+        return "Transaction voided. Reversal entry id=" + reversal.getId()
+                + ". Re-record the correct transaction now.";
+    }
 }

@@ -13,7 +13,10 @@ import org.springframework.ai.mcp.annotation.McpArg;
 import org.springframework.ai.mcp.annotation.McpTool;
 import org.springframework.stereotype.Component;
 
+import java.time.LocalDate;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 @Component
 @RequiredArgsConstructor
@@ -114,6 +117,34 @@ public class ReportingTools {
     ) {
         int m = months != null ? Math.min(Math.max(months, 1), 24) : 6;
         return reportingService.getSpendingAverages(m);
+    }
+
+    @McpTool(
+            name = "get_financial_year_summary",
+            description = """
+                    Returns a cash flow summary for the current Indian financial year (April 1 – March 31).
+                    Automatically computes the correct FY boundaries based on today's date.
+                    Also includes spending by category for the same period.
+                    Use for tax filing season, annual reviews, or ITR preparation.
+                    """,
+            annotations = @McpTool.McpAnnotations(readOnlyHint = true)
+    )
+    public Map<String, Object> getFinancialYearSummary() {
+        LocalDate today = LocalDate.now();
+        int fyStartYear = today.getMonthValue() >= 4 ? today.getYear() : today.getYear() - 1;
+        LocalDate from = LocalDate.of(fyStartYear, 4, 1);
+        LocalDate to = LocalDate.of(fyStartYear + 1, 3, 31);
+
+        CashFlowDto cashFlow = reportingService.getCashFlow(from, to);
+        List<SpendingByCategoryDto> breakdown = reportingService.getSpendingByCategory(from, to);
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("financialYear", "FY" + fyStartYear + "-" + (fyStartYear + 1));
+        result.put("from", from.toString());
+        result.put("to", to.toString());
+        result.put("cashFlow", cashFlow);
+        result.put("spendingByCategory", breakdown);
+        return result;
     }
 
     @McpTool(

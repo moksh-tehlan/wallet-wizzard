@@ -21,8 +21,8 @@ public class GuideTools {
 
                 ## Tool Index
                   Accounts:          get_account_types, add_account, rename_account, list_accounts, get_account_balance
-                  Transactions:      record_transaction, get_transactions
-                  Reporting:         get_cash_flow, get_net_worth, get_monthly_report, get_spending_by_category, get_spending_averages, get_monthly_trend
+                  Transactions:      record_transaction, get_transactions, void_transaction
+                  Reporting:         get_cash_flow, get_net_worth, get_monthly_report, get_spending_by_category, get_spending_averages, get_monthly_trend, get_financial_year_summary
                   Debts:             add_debt, list_debts, get_debt_summary, settle_debt
                   Loans:             add_loan, record_loan_payment, list_loans, get_loan_summary, set_loan_auto_pay
                   Loan Schedules:    generate_loan_schedule, import_loan_schedule, get_loan_schedule, pay_installment
@@ -31,7 +31,7 @@ public class GuideTools {
                   People:            add_person, list_people, update_person
                   Person Balance:    get_person_balance
                   Recurring:         add_recurring_transaction, record_recurring_payment, list_recurring_transactions, update_recurring_transaction_status, get_upcoming_bills
-                  Investments:       search_mutual_fund, add_investment, record_investment_contribution, refresh_investment_values, get_portfolio, close_investment, set_investment_auto_contribute
+                  Investments:       search_mutual_fund, add_investment, record_investment_contribution, refresh_investment_values, get_portfolio, close_investment, get_upcoming_maturities, set_investment_auto_contribute
                   Expense Groups:    create_expense_group, add_group_member, add_group_expense, list_groups, list_group_expenses, get_group_balance, settle_group_member
                   Scheduler:         trigger_auto_pay
 
@@ -221,6 +221,22 @@ public class GuideTools {
                     → per category: averageMonthlySpend, maxMonthSpend, minMonthSpend, monthsWithData
                   get_monthly_trend(months=6)
                     → month-by-month income/expenses + averages; most recent first
+                  get_financial_year_summary()
+                    → cash flow + spending breakdown for current Indian FY (Apr 1 – Mar 31)
+                    → useful for tax filing, ITR prep, annual reviews
+
+                ## Correcting Mistakes
+
+                  void_transaction(journalEntryId)
+                    → creates a reversal entry (all debits/credits flipped); original is kept for audit
+                    → use get_transactions to find the wrong entry's id
+                    → re-record the correct transaction after voiding
+
+                ## Investment Maturities
+
+                  get_upcoming_maturities(days=30)
+                    → FD/RD investments maturing within the next N days
+                    → plan renewals or reinvestments in advance
                 """;
     }
 }

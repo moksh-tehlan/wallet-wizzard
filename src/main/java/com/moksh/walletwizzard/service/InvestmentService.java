@@ -171,6 +171,10 @@ public class InvestmentService {
                 : investmentRepository.findAllWithAccount();
     }
 
+    public List<Investment> getUpcomingMaturities(int days) {
+        return investmentRepository.findUpcomingMaturities(LocalDate.now().plusDays(days));
+    }
+
     public List<MfNavService.SchemeResult> searchMutualFunds(String query) {
         return mfNavService.searchSchemes(query);
     }

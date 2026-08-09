@@ -194,6 +194,36 @@ public class InvestmentTools {
     }
 
     @McpTool(
+            name = "get_upcoming_maturities",
+            description = """
+                    Lists FD and RD investments maturing within the next N days.
+                    Use this to plan what to do with maturing deposits (renew, withdraw, reinvest).
+                    Returns name, type, maturityDate, investedAmount, currentValue for each.
+                    days defaults to 30.
+                    """,
+            annotations = @McpTool.McpAnnotations(readOnlyHint = true)
+    )
+    public String getUpcomingMaturities(
+            @McpArg(name = "days", description = "Look-ahead window in days (default 30)", required = false) Integer days
+    ) {
+        int window = days != null ? days : 30;
+        List<Investment> maturities = investmentService.getUpcomingMaturities(window);
+        if (maturities.isEmpty()) return "No investments maturing in the next " + window + " days.";
+
+        List<java.util.Map<String, String>> rows = maturities.stream().map(inv -> {
+            java.util.Map<String, String> row = new java.util.LinkedHashMap<>();
+            row.put("id", inv.getId().toString());
+            row.put("name", inv.getName());
+            row.put("type", inv.getType().name());
+            row.put("maturityDate", inv.getMaturityDate().toString());
+            row.put("investedAmount", inv.getInvestedAmount().toPlainString());
+            row.put("currentValue", inv.getCurrentValue().toPlainString());
+            return row;
+        }).toList();
+        return objectMapper.writeValueAsString(rows);
+    }
+
+    @McpTool(
             name = "set_investment_auto_contribute",
             description = """
                     Enables automatic monthly contributions for an RD or MF SIP investment.
