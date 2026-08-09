@@ -3,6 +3,7 @@ package com.moksh.walletwizzard.service;
 import com.moksh.walletwizzard.config.TenantContext;
 import com.moksh.walletwizzard.dto.CreateAccountRequest;
 import com.moksh.walletwizzard.dto.CreateInvestmentRequest;
+import com.moksh.walletwizzard.entity.Account;
 import com.moksh.walletwizzard.dto.LineRequest;
 import com.moksh.walletwizzard.dto.RecordTransactionRequest;
 import com.moksh.walletwizzard.entity.Account;
@@ -56,6 +57,14 @@ public class InvestmentService {
         BigDecimal currentValue = computeInitialValue(req);
 
         User userRef = entityManager.getReference(User.class, TenantContext.getCurrentUser());
+
+        Account defaultBankAccount = null;
+        LocalDate nextContributionDate = null;
+        if (req.bankAccountId() != null && req.monthlyContribution() != null) {
+            defaultBankAccount = entityManager.getReference(Account.class, req.bankAccountId());
+            nextContributionDate = today.plusMonths(1);
+        }
+
         Investment investment = Investment.builder()
                 .user(userRef)
                 .account(investmentAccount)
@@ -71,6 +80,8 @@ public class InvestmentService {
                 .maturityDate(req.maturityDate())
                 .lastRefreshedAt(LocalDate.now())
                 .notes(req.notes())
+                .defaultBankAccount(defaultBankAccount)
+                .nextContributionDate(nextContributionDate)
                 .build();
 
         log.info("Added investment '{}' type={} amount={}", req.name(), req.type(), req.amount());
@@ -93,9 +104,10 @@ public class InvestmentService {
             // Create a balanced entry with Opening Equity placeholder
             postSingleSidedContribution(inv, amount);
         } else {
+            // null referenceId: nextContributionDate advancement is the idempotency guard
             accountingService.record(new RecordTransactionRequest(
                     LocalDate.now(), "Contribution — " + inv.getName(),
-                    EntryType.TRANSFER, inv.getId(), lines));
+                    EntryType.TRANSFER, null, lines));
         }
 
         inv.setInvestedAmount(inv.getInvestedAmount().add(amount));
@@ -103,7 +115,21 @@ public class InvestmentService {
             inv.setUnits(inv.getUnits().add(unitsAdded));
         }
         inv.setCurrentValue(recompute(inv));
+        if (inv.getNextContributionDate() != null) {
+            inv.setNextContributionDate(inv.getNextContributionDate().plusMonths(1));
+        }
         log.info("Recorded contribution of {} to '{}' (total invested: {})", amount, inv.getName(), inv.getInvestedAmount());
+        return inv;
+    }
+
+    @Transactional
+    public Investment configureAutoContribute(UUID investmentId, UUID bankAccountId) {
+        Investment inv = requireInvestment(investmentId);
+        inv.setDefaultBankAccount(entityManager.getReference(Account.class, bankAccountId));
+        if (inv.getNextContributionDate() == null && inv.getMonthlyContribution() != null) {
+            inv.setNextContributionDate(LocalDate.now().plusMonths(1));
+        }
+        log.info("Configured auto-contribute for '{}' from bank account {}", inv.getName(), bankAccountId);
         return inv;
     }
 

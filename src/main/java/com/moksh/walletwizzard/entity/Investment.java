@@ -72,6 +72,14 @@ public class Investment extends Auditable {
 
     private String notes;
 
+    /** When set, monthly contributions are auto-recorded from this account by the daily scheduler. */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "default_bank_account_id")
+    private Account defaultBankAccount;
+
+    /** Next date a contribution should be auto-recorded (RD/MF SIP). */
+    private LocalDate nextContributionDate;
+
     @Version
     @Builder.Default
     private Long version = 0L;

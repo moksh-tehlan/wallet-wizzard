@@ -5,6 +5,7 @@ import com.moksh.walletwizzard.enums.InvestmentType;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
@@ -24,4 +25,15 @@ public interface InvestmentRepository extends JpaRepository<Investment, UUID> {
             ORDER BY i.name
             """)
     List<Investment> findByTypeWithAccount(InvestmentType type);
+
+    @Query("""
+            SELECT i FROM Investment i
+            JOIN FETCH i.account
+            JOIN FETCH i.defaultBankAccount
+            WHERE i.defaultBankAccount IS NOT NULL
+              AND i.nextContributionDate IS NOT NULL
+              AND i.nextContributionDate <= :today
+              AND i.monthlyContribution IS NOT NULL
+            """)
+    List<Investment> findDueContributions(LocalDate today);
 }

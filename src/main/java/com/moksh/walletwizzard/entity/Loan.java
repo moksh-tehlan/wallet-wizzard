@@ -62,4 +62,9 @@ public class Loan extends Auditable {
     private LocalDate endDate;
 
     private String notes;
+
+    /** When set, EMIs are auto-paid from this account by the daily scheduler. */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "default_bank_account_id")
+    private Account defaultBankAccount;
 }

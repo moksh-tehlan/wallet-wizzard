@@ -110,6 +110,15 @@ public class LoanService {
         return toSummary(loan, Map.of(loan.getAccount().getId(), balance));
     }
 
+    @Transactional
+    public Loan setDefaultBankAccount(UUID loanId, UUID bankAccountId) {
+        Loan loan = loanRepository.findById(loanId)
+                .orElseThrow(() -> new ResourceNotFoundException("Loan", loanId));
+        loan.setDefaultBankAccount(entityManager.getReference(Account.class, bankAccountId));
+        log.info("Set auto-pay bank account {} for loan '{}'", bankAccountId, loan.getName());
+        return loan;
+    }
+
     // ── Private helpers ──────────────────────────────────────────────────────
 
     private Account resolveInterestAccount(CreateLoanRequest request) {

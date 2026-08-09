@@ -88,11 +88,12 @@ public class SubscriptionService {
             );
         }
 
+        // null referenceId: nextBillingDate advancement is the idempotency guard for recurring payments
         accountingService.record(new RecordTransactionRequest(
                 paymentDate,
                 "Recurring — " + sub.getName(),
                 EntryType.SUBSCRIPTION,
-                sub.getId(),
+                null,
                 lines));
 
         LocalDate base = sub.getNextBillingDate() != null ? sub.getNextBillingDate() : paymentDate;

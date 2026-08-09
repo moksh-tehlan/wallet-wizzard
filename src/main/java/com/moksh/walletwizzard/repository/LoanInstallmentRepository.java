@@ -36,4 +36,15 @@ public interface LoanInstallmentRepository extends JpaRepository<LoanInstallment
     List<LoanInstallment> findPaidAndDueByLoanId(UUID loanId);
 
     List<LoanInstallment> findByLoanIdAndStatus(UUID loanId, InstallmentStatus status);
+
+    @Query("""
+            SELECT i FROM LoanInstallment i
+            JOIN FETCH i.loan l
+            JOIN FETCH l.defaultBankAccount
+            WHERE i.status IN ('SCHEDULED', 'DUE')
+              AND i.dueDate <= :today
+              AND l.defaultBankAccount IS NOT NULL
+            ORDER BY i.dueDate
+            """)
+    List<LoanInstallment> findDueForAutoPay(LocalDate today);
 }

@@ -6,6 +6,7 @@ import com.moksh.walletwizzard.dto.PersonBalanceDto;
 import com.moksh.walletwizzard.dto.UpcomingPaymentDto;
 import com.moksh.walletwizzard.mcp.McpInputs;
 import com.moksh.walletwizzard.service.LoanScheduleService;
+import com.moksh.walletwizzard.service.LoanService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.ai.mcp.annotation.McpArg;
 import org.springframework.ai.mcp.annotation.McpTool;
@@ -19,6 +20,7 @@ import java.util.List;
 public class LoanScheduleTools {
 
     private final LoanScheduleService loanScheduleService;
+    private final LoanService loanService;
 
     @McpTool(
             name = "generate_loan_schedule",
@@ -195,6 +197,31 @@ public class LoanScheduleTools {
             @McpArg(name = "personId", description = "UUID of the person", required = true) String personId
     ) {
         return loanScheduleService.getPersonBalance(McpInputs.requireUuid(personId, "personId"));
+    }
+
+    @McpTool(
+            name = "set_loan_auto_pay",
+            description = """
+                    Enables automatic EMI payment for a loan.
+                    Once configured, the daily scheduler will automatically pay each installment
+                    from the specified bank account on its due date — no manual action needed.
+
+                    The loan must have a schedule (generate_loan_schedule or import_loan_schedule).
+                    Co-borrower tracking is automatic: getPersonBalance will update as installments are paid.
+                    To disable, call this tool again with a null/empty bankAccountId is not supported —
+                    instead, contact support or delete the loan schedule.
+                    """,
+            annotations = @McpTool.McpAnnotations(readOnlyHint = false, destructiveHint = false)
+    )
+    public String setLoanAutoPay(
+            @McpArg(name = "loanId", description = "UUID of the loan", required = true) String loanId,
+            @McpArg(name = "bankAccountId", description = "UUID of the bank account to debit for EMIs", required = true) String bankAccountId
+    ) {
+        var loan = loanService.setDefaultBankAccount(
+                McpInputs.requireUuid(loanId, "loanId"),
+                McpInputs.requireUuid(bankAccountId, "bankAccountId")
+        );
+        return "Auto-pay enabled for loan '" + loan.getName() + "'. EMIs will be paid automatically from bank account " + bankAccountId + ".";
     }
 
     // ── Input DTO for import ─────────────────────────────────────────────────

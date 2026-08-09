@@ -194,6 +194,31 @@ public class InvestmentTools {
     }
 
     @McpTool(
+            name = "set_investment_auto_contribute",
+            description = """
+                    Enables automatic monthly contributions for an RD or MF SIP investment.
+                    Once configured, the daily scheduler will debit bankAccountId and record
+                    a contribution on each nextContributionDate without any manual action.
+
+                    The investment must have monthlyContribution set (it is set automatically when
+                    you call add_investment with monthlyContribution + bankAccountId).
+                    Use this tool to configure auto-contribute on an existing investment, or to
+                    change which bank account is used.
+                    """,
+            annotations = @McpTool.McpAnnotations(readOnlyHint = false, destructiveHint = false)
+    )
+    public String setInvestmentAutoContribute(
+            @McpArg(name = "investmentId", description = "UUID of the investment", required = true) String investmentId,
+            @McpArg(name = "bankAccountId", description = "UUID of the bank account to debit each month", required = true) String bankAccountId
+    ) {
+        Investment inv = investmentService.configureAutoContribute(
+                McpInputs.requireUuid(investmentId, "investmentId"),
+                McpInputs.requireUuid(bankAccountId, "bankAccountId")
+        );
+        return "Auto-contribute enabled for '" + inv.getName() + "'. Next contribution date: " + inv.getNextContributionDate();
+    }
+
+    @McpTool(
             name = "close_investment",
             description = """
                     Closes/matures an investment (FD maturity, MF redemption, etc.).
