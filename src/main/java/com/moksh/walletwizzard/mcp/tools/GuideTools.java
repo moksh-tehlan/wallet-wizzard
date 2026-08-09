@@ -20,19 +20,20 @@ public class GuideTools {
                 # WalletWizzard — Agent Guide
 
                 ## Tool Index
-                  Accounts:          get_account_types, add_account, list_accounts, get_account_balance
+                  Accounts:          get_account_types, add_account, rename_account, list_accounts, get_account_balance
                   Transactions:      record_transaction, get_transactions
                   Reporting:         get_cash_flow, get_net_worth, get_monthly_report, get_spending_by_category, get_spending_averages, get_monthly_trend
                   Debts:             add_debt, list_debts, get_debt_summary, settle_debt
-                  Loans:             add_loan, record_loan_payment, list_loans, get_loan_summary
+                  Loans:             add_loan, record_loan_payment, list_loans, get_loan_summary, set_loan_auto_pay
                   Loan Schedules:    generate_loan_schedule, import_loan_schedule, get_loan_schedule, pay_installment
                   Loan Participants: add_loan_participant, get_loan_share_summary
                   Upcoming:          get_upcoming_loan_payments, get_upcoming_bills
                   People:            add_person, list_people, update_person
                   Person Balance:    get_person_balance
                   Recurring:         add_recurring_transaction, record_recurring_payment, list_recurring_transactions, update_recurring_transaction_status, get_upcoming_bills
-                  Investments:       search_mutual_fund, add_investment, record_investment_contribution, refresh_investment_values, get_portfolio, close_investment
+                  Investments:       search_mutual_fund, add_investment, record_investment_contribution, refresh_investment_values, get_portfolio, close_investment, set_investment_auto_contribute
                   Expense Groups:    create_expense_group, add_group_member, add_group_expense, list_groups, list_group_expenses, get_group_balance, settle_group_member
+                  Scheduler:         trigger_auto_pay
 
                 ## Accounts
 
@@ -85,7 +86,12 @@ public class GuideTools {
                 direction: TAKEN (you borrowed) | GIVEN (you lent formally)
                 interestRate: decimal — 0.0875 = 8.75% per annum
 
-                Installment statuses: SCHEDULED → DUE (auto, daily) → PAID
+                Installment statuses: SCHEDULED → DUE (auto, daily 00:05) → PAID
+
+                Auto-pay (optional):
+                  set_loan_auto_pay(loanId, bankAccountId)
+                  → daily 06:00 scheduler pays each DUE installment automatically from that account
+                  → co-borrower balances (get_person_balance) update automatically as installments are paid
 
                 ## Shared Loans (co-borrowers)
 
@@ -106,6 +112,7 @@ public class GuideTools {
                 Flow:
                   1. add_recurring_transaction(name, amount, billingCycle, side, scheduleType, paymentAccountId, categoryAccountId)
                   2. record_recurring_payment(recurringId) each cycle → posts journal entry, advances next date
+                     OR let the daily 06:00 scheduler handle it automatically (no config needed)
                   3. list_recurring_transactions(status=ACTIVE) to see all
                   4. update_recurring_transaction_status(recurringId, status=PAUSED/CANCELLED) to pause or cancel
 
@@ -171,7 +178,7 @@ public class GuideTools {
                   2. add_investment(type=MUTUAL_FUND, schemeCode, units, amount, bankAccountId)
                      → live NAV fetched immediately, currentValue = units × NAV
                   3. refresh_investment_values() anytime for updated NAV
-                  4. record_investment_contribution(investmentId, amount, unitsAdded) for SIP
+                  4. record_investment_contribution(investmentId, amount, unitsAdded) for manual SIP
                   5. close_investment(investmentId, bankAccountId) on redemption
 
                 Flow — FD:
@@ -179,10 +186,16 @@ public class GuideTools {
                   2. refresh_investment_values() → value recomputed using quarterly compounding
                   3. close_investment(investmentId, bankAccountId) on maturity
 
-                Flow — RD:
+                Flow — RD (manual):
                   1. add_investment(type=RD, amount=firstInstallment, interestRate, monthlyContribution, maturityDate, bankAccountId)
                   2. record_investment_contribution(investmentId, amount, bankAccountId) each month
                   3. close_investment(investmentId, bankAccountId) on maturity
+
+                Flow — RD (auto-contribute):
+                  1. add_investment(type=RD, amount=firstInstallment, interestRate, monthlyContribution, maturityDate, bankAccountId)
+                     → when both monthlyContribution AND bankAccountId are provided, nextContributionDate is set automatically
+                     → daily 06:00 scheduler debits bankAccountId each month — no manual action needed
+                  OR for an existing RD: set_investment_auto_contribute(investmentId, bankAccountId)
 
                 Flow — EPF:
                   1. add_investment(type=EPF, amount=currentBalance, interestRate=0.0825)
@@ -191,6 +204,16 @@ public class GuideTools {
                   3. refresh_investment_values() → value recomputed with compound interest
 
                 interestRate: decimal — 0.07 = 7%, 0.0825 = 8.25% (EPF default)
+
+                ## Auto-Pay Scheduler
+
+                Runs daily at 06:00. Automatically processes:
+                  - All ACTIVE recurring transactions with nextBillingDate ≤ today
+                  - Loan installments that are DUE and have set_loan_auto_pay configured
+                  - RD/SIP contributions with nextContributionDate ≤ today and set_investment_auto_contribute configured
+
+                To test or manually trigger: trigger_auto_pay()
+                Each run is safe to repeat — dates advance after processing, so items are not double-processed.
 
                 ## Spending Baseline & Trends
 
