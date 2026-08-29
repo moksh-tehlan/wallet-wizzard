@@ -174,7 +174,6 @@ public class LoanScheduleService {
     // ── Participants ─────────────────────────────────────────────────────────
 
     @Transactional
-    @Transactional
     public LoanParticipant settleParticipantShare(UUID loanId, UUID personId, BigDecimal amount) {
         LoanParticipant participant = participantRepository.findByLoanIdAndPersonId(loanId, personId)
                 .orElseThrow(() -> new ResourceNotFoundException(
