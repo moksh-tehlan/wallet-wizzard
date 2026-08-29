@@ -5,6 +5,7 @@ import com.moksh.walletwizzard.reporting.ReportingService;
 import com.moksh.walletwizzard.reporting.dto.CashFlowDto;
 import com.moksh.walletwizzard.reporting.dto.MonthlyReportDto;
 import com.moksh.walletwizzard.reporting.dto.MonthlyTrendDto;
+import com.moksh.walletwizzard.reporting.dto.LiquidNetWorthDto;
 import com.moksh.walletwizzard.reporting.dto.NetWorthDto;
 import com.moksh.walletwizzard.reporting.dto.SpendingAverageDto;
 import com.moksh.walletwizzard.reporting.dto.SpendingByCategoryDto;
@@ -41,6 +42,29 @@ public class ReportingTools {
                 McpInputs.parseDate(from, "from"),
                 McpInputs.parseDate(to, "to")
         );
+    }
+
+    @McpTool(
+            name = "get_liquid_net_worth",
+            description = """
+                    Returns your true liquid financial position — what you'd actually have if you
+                    cleared all short-term obligations today.
+
+                    Includes:
+                      cashAndBanks     — all BANK_ACCOUNT + CASH_AND_WALLET balances
+                      receivables      — money others owe you (informal debts)
+                      investments      — current market value of all investments
+                      creditCardDebt   — total outstanding credit card balances (shown as positive = what you owe)
+                      otherLiabilities — any OTHER_LIABILITY accounts
+                      liquidNetWorth   — cashAndBanks + receivables + investments − creditCardDebt − otherLiabilities
+
+                    Excludes long-term loans (LOAN_PAYABLE) entirely — use get_net_worth for the full
+                    picture including loans and shared loan receivables from co-borrowers.
+                    """,
+            annotations = @McpTool.McpAnnotations(readOnlyHint = true)
+    )
+    public LiquidNetWorthDto getLiquidNetWorth() {
+        return reportingService.getLiquidNetWorth();
     }
 
     @McpTool(

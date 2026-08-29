@@ -6,6 +6,7 @@ import com.moksh.walletwizzard.reporting.dto.AccountBalanceDto;
 import com.moksh.walletwizzard.reporting.dto.CashFlowDto;
 import com.moksh.walletwizzard.reporting.dto.MonthlyReportDto;
 import com.moksh.walletwizzard.reporting.dto.MonthlyTrendDto;
+import com.moksh.walletwizzard.reporting.dto.LiquidNetWorthDto;
 import com.moksh.walletwizzard.reporting.dto.NetWorthDto;
 import com.moksh.walletwizzard.reporting.dto.SpendingAverageDto;
 import com.moksh.walletwizzard.reporting.dto.SpendingByCategoryDto;
@@ -195,6 +196,57 @@ public class ReportingService {
 
         BigDecimal totalAssets = decimal(row[0]).add(totalInvested);
         return NetWorthDto.of(effectiveDate, totalAssets, decimal(row[1]), sharedLoanReceivables, investmentGains);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Liquid Net Worth
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /**
+     * Cash + receivables + investments minus credit cards and short-term liabilities.
+     * Excludes long-term loans (LOAN_PAYABLE) entirely — shows what you'd have if
+     * you cleared all short-term obligations today.
+     */
+    public LiquidNetWorthDto getLiquidNetWorth() {
+        LocalDate today = LocalDate.now();
+
+        String sql = """
+                SELECT
+                    a.sub_type,
+                    COALESCE(SUM(
+                        CASE WHEN jel.side = a.normal_balance THEN jel.amount ELSE -jel.amount END
+                    ), 0) AS balance
+                FROM accounts a
+                LEFT JOIN journal_entry_lines jel ON jel.account_id = a.id
+                WHERE a.is_active = true
+                  AND a.sub_type IN ('BANK_ACCOUNT','CASH_AND_WALLET','RECEIVABLE',
+                                     'CREDIT_CARD','OTHER_LIABILITY')
+                GROUP BY a.sub_type
+                """;
+
+        @SuppressWarnings("unchecked")
+        List<Object[]> rows = em.createNativeQuery(sql).getResultList();
+
+        BigDecimal cashAndBanks = BigDecimal.ZERO;
+        BigDecimal receivables  = BigDecimal.ZERO;
+        BigDecimal creditCards  = BigDecimal.ZERO;
+        BigDecimal otherLiab    = BigDecimal.ZERO;
+
+        for (Object[] r : rows) {
+            String sub = (String) r[0];
+            BigDecimal bal = decimal(r[1]);
+            switch (sub) {
+                case "BANK_ACCOUNT", "CASH_AND_WALLET" -> cashAndBanks = cashAndBanks.add(bal);
+                case "RECEIVABLE"                       -> receivables  = receivables.add(bal);
+                case "CREDIT_CARD"                      -> creditCards  = creditCards.add(bal);
+                case "OTHER_LIABILITY"                  -> otherLiab    = otherLiab.add(bal);
+            }
+        }
+
+        String invSql = "SELECT COALESCE(SUM(current_value), 0) FROM investments";
+        BigDecimal investments = decimal(em.createNativeQuery(invSql).getSingleResult());
+
+        return LiquidNetWorthDto.of(today, cashAndBanks, receivables, investments, creditCards, otherLiab);
     }
 
     // ─────────────────────────────────────────────────────────────────────────
