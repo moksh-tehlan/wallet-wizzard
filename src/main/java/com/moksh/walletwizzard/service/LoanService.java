@@ -63,6 +63,8 @@ public class LoanService {
                 buildDisbursementLines(request, loanAccount.getId())));
 
         User userRef = entityManager.getReference(User.class, TenantContext.getCurrentUser());
+        Account defaultBankAccount = entityManager.getReference(Account.class, request.bankAccountId());
+
         Loan loan = Loan.builder()
                 .user(userRef)
                 .account(loanAccount)
@@ -75,6 +77,7 @@ public class LoanService {
                 .startDate(request.startDate())
                 .endDate(request.endDate())
                 .notes(request.notes())
+                .defaultBankAccount(defaultBankAccount)
                 .build();
 
         log.info("Creating loan '{}' direction={} principal={}", request.name(), request.direction(), request.principal());

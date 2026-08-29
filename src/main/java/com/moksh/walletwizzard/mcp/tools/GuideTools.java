@@ -79,20 +79,18 @@ public class GuideTools {
 
                 Flow:
                   1. add_loan(name, direction, principal, interestRate, startDate, bankAccountId) → loanId
+                     → bankAccountId is automatically set as the EMI auto-pay account (no extra step)
                   2. generate_loan_schedule(loanId, numberOfInstallments) → creates amortization schedule
                      OR import_loan_schedule(loanId, [{dueDate, principalAmount, interestAmount}])
-                  3. get_loan_schedule(loanId) → see all installments
-                  4. pay_installment(installmentId, bankAccountId) → marks PAID, posts journal entry
+                  3. EMIs are now fully automatic — nothing else needed.
 
                 direction: TAKEN (you borrowed) | GIVEN (you lent formally)
                 interestRate: decimal — 0.0875 = 8.75% per annum
 
-                Installment statuses: SCHEDULED → DUE (auto, daily 00:05) → PAID
+                Installment statuses: SCHEDULED → DUE (daily 00:05) → PAID (daily 06:00, auto)
 
-                Auto-pay (optional):
-                  set_loan_auto_pay(loanId, bankAccountId)
-                  → daily 06:00 scheduler pays each DUE installment automatically from that account
-                  → co-borrower balances (get_person_balance) update automatically as installments are paid
+                To change the auto-pay bank account later: set_loan_auto_pay(loanId, bankAccountId)
+                To pay manually instead: pay_installment(installmentId, bankAccountId)
 
                 ## Shared Loans (co-borrowers)
 

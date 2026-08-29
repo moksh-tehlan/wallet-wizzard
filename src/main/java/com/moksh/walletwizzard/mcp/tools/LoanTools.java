@@ -30,6 +30,9 @@ public class LoanTools {
                     The loan account tracks the outstanding principal automatically.
                     interestRate is a decimal: 0.0875 = 8.75% per annum.
                     bankAccountId: where the loan proceeds were deposited (TAKEN) or withdrawn (GIVEN).
+                      This account is also set as the auto-pay account — once you generate a schedule,
+                      EMIs are paid automatically every day at 06:00 from this account. No extra setup.
+                      Use set_loan_auto_pay to change the account later if needed.
                     interestAccountId: expense account for interest (TAKEN) or income account (GIVEN).
                       Leave null to use the first system Expense/Income account automatically.
                     """,
