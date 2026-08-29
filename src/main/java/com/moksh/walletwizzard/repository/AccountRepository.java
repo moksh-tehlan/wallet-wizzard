@@ -26,6 +26,10 @@ public interface AccountRepository extends JpaRepository<Account, UUID> {
 
     Optional<Account> findByNameAndIsActiveTrue(String name);
 
+    @Query(value = "SELECT EXISTS(SELECT 1 FROM journal_entry_lines WHERE account_id = :accountId)",
+            nativeQuery = true)
+    boolean hasTransactions(@Param("accountId") UUID accountId);
+
     @Query(value = """
             SELECT COALESCE(SUM(
                 CASE WHEN jel.side = a.normal_balance THEN jel.amount ELSE -jel.amount END

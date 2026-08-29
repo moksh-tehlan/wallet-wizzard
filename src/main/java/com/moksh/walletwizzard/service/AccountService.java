@@ -117,10 +117,23 @@ public class AccountService {
     }
 
     @Transactional
+    public Account updateNotes(UUID id, String notes) {
+        Account account = getById(id);
+        account.setNotes(notes);
+        log.info("Updated notes for account {}", id);
+        return account;
+    }
+
+    @Transactional
     public Account deactivate(UUID id) {
         Account account = getById(id);
         if (account.isSystem()) {
-            throw new IllegalStateException("System accounts cannot be deactivated.");
+            throw new InvalidInputException("System accounts cannot be deleted.");
+        }
+        if (accountRepository.hasTransactions(id)) {
+            throw new InvalidInputException(
+                    "Account '" + account.getName() + "' has transactions and cannot be deleted. "
+                    + "Use void_transaction to reverse entries first, or use reset_account to wipe everything.");
         }
         log.info("Deactivating account {}", id);
         account.setActive(false);

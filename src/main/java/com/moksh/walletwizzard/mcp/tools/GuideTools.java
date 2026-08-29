@@ -20,7 +20,7 @@ public class GuideTools {
                 # WalletWizzard — Agent Guide
 
                 ## Tool Index
-                  Accounts:          get_account_types, add_account, rename_account, list_accounts, get_account_balance
+                  Accounts:          get_account_types, add_account, rename_account, update_account, delete_account, list_accounts, get_account_balance
                   Transactions:      record_transaction, get_transactions, void_transaction
                   Reporting:         get_cash_flow, get_net_worth, get_monthly_report, get_spending_by_category, get_spending_averages, get_monthly_trend, get_financial_year_summary
                   Debts:             add_debt, list_debts, get_debt_summary, settle_debt

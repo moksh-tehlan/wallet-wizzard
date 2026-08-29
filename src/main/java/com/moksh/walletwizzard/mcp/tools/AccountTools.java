@@ -154,4 +154,40 @@ public class AccountTools {
         var account = accountService.rename(McpInputs.requireUuid(accountId, "accountId"), newName);
         return "Account renamed to: " + account.getName();
     }
+
+    @McpTool(
+            name = "update_account",
+            description = "Updates the notes on an existing account. Use this to add context like 'joint account with wife' or 'FD at HDFC branch'.",
+            annotations = @McpTool.McpAnnotations(readOnlyHint = false, destructiveHint = false, idempotentHint = true)
+    )
+    public String updateAccount(
+            @McpArg(name = "accountId", description = "UUID of the account", required = true) String accountId,
+            @McpArg(name = "notes", description = "Notes to set (pass empty string to clear)", required = true) String notes
+    ) {
+        var account = accountService.updateNotes(
+                McpInputs.requireUuid(accountId, "accountId"),
+                notes.isBlank() ? null : notes);
+        return "Account '" + account.getName() + "' notes updated.";
+    }
+
+    @McpTool(
+            name = "delete_account",
+            description = """
+                    Deletes (deactivates) an account. The account is soft-deleted — hidden from
+                    all lists but kept in the database for audit purposes.
+
+                    Blocked if:
+                    - The account has any transactions (void them first with void_transaction)
+                    - The account is a system account (Cash, Salary, etc.)
+
+                    Use reset_account to wipe everything at once.
+                    """,
+            annotations = @McpTool.McpAnnotations(readOnlyHint = false, destructiveHint = true)
+    )
+    public String deleteAccount(
+            @McpArg(name = "accountId", description = "UUID of the account to delete", required = true) String accountId
+    ) {
+        var account = accountService.deactivate(McpInputs.requireUuid(accountId, "accountId"));
+        return "Account '" + account.getName() + "' deleted successfully.";
+    }
 }
