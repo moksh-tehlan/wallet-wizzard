@@ -12,6 +12,7 @@ public record PersonBalanceDto(
         String personName,
         List<DirectDebtView> directDebts,
         List<LoanParticipationView> loanParticipations,
+        List<AccountParticipationView> accountParticipations,
         /** Positive = person owes you; negative = you owe person */
         BigDecimal netBalance
 ) {
@@ -31,5 +32,17 @@ public record PersonBalanceDto(
             BigDecimal paidByUser,
             BigDecimal currentlyDue,
             BigDecimal scheduledFuture
+    ) {}
+
+    /**
+     * Share of any non-loan account (credit card, informal liability, etc.).
+     * outstandingShare = currentBalance × sharePercent — what they owe you right now.
+     */
+    public record AccountParticipationView(
+            UUID accountId,
+            String accountName,
+            String accountType,
+            BigDecimal sharePercent,
+            BigDecimal outstandingShare
     ) {}
 }

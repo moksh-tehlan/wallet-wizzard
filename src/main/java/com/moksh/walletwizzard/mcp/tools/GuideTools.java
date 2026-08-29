@@ -33,6 +33,7 @@ public class GuideTools {
                   Recurring:         add_recurring_transaction, record_recurring_payment, list_recurring_transactions, update_recurring_transaction_status, get_upcoming_bills
                   Investments:       search_mutual_fund, add_investment, record_investment_contribution, refresh_investment_values, get_portfolio, close_investment, get_upcoming_maturities, set_investment_auto_contribute
                   Expense Groups:    create_expense_group, add_group_member, add_group_expense, list_groups, list_group_expenses, get_group_balance, settle_group_member
+                  Shared Liabilities: add_account_participant, list_account_participants, get_account_share_summary
                   Scheduler:         trigger_auto_pay
 
                 ## Accounts
@@ -237,6 +238,31 @@ public class GuideTools {
                   get_upcoming_maturities(days=30)
                     → FD/RD investments maturing within the next N days
                     → plan renewals or reinvestments in advance
+
+                ## Shared Liabilities (credit cards, co-borrowed accounts)
+
+                Works for ANY account — credit card, loan account, informal liability.
+
+                Flow:
+                  1. list_accounts() → find the accountId (e.g. credit card LIABILITY account)
+                  2. add_account_participant(accountId, personId, sharePercent=50)
+                  3. get_account_share_summary(accountId)
+                     → shows currentBalance and each person's outstandingShare (balance × share%)
+                  4. get_person_balance(personId)
+                     → accountParticipations now included in netBalance automatically
+
+                Credit card auto-pay (using recurring transactions):
+                  If you want to auto-pay a fixed credit card minimum each month:
+                  add_recurring_transaction(
+                    name="CC Minimum Payment",
+                    side=DEBIT,
+                    billingCycle=MONTHLY,
+                    paymentAccountId=<bank_account>,
+                    categoryAccountId=<credit_card_account>  ← debits the LIABILITY, reducing balance
+                  )
+
+                For TAKEN loans, use add_loan_participant instead (tracks installment-level history).
+                For informal point-to-point debts, use add_debt / settle_debt.
                 """;
     }
 }

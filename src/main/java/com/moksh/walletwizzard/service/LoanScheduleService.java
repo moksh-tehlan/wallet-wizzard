@@ -39,6 +39,7 @@ public class LoanScheduleService {
     private final AccountingService accountingService;
     private final AccountService accountService;
     private final PersonService personService;
+    private final AccountParticipantService accountParticipantService;
     private final EntityManager entityManager;
 
     // ── Schedule Generation ──────────────────────────────────────────────────
@@ -305,10 +306,30 @@ public class LoanScheduleService {
             loanNetBalance = loanNetBalance.add(owedByPerson);
         }
 
+        // Account participations (credit card, any other shared liability)
+        List<com.moksh.walletwizzard.entity.AccountParticipant> accountParticipants =
+                accountParticipantService.getParticipantsForPerson(personId);
+        List<PersonBalanceDto.AccountParticipationView> accountViews = new ArrayList<>();
+        BigDecimal accountNetBalance = BigDecimal.ZERO;
+
+        for (com.moksh.walletwizzard.entity.AccountParticipant ap : accountParticipants) {
+            BigDecimal balance = accountService.getBalance(ap.getAccount().getId());
+            BigDecimal share = balance.multiply(ap.getSharePercent())
+                    .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
+            accountViews.add(new PersonBalanceDto.AccountParticipationView(
+                    ap.getAccount().getId(), ap.getAccount().getName(),
+                    ap.getAccount().getType().name(), ap.getSharePercent(), share));
+            // For LIABILITY accounts, balance is positive → person owes you their share
+            // For ASSET accounts, balance is positive → you owe them their share (rare)
+            BigDecimal contribution = ap.getAccount().getType() == com.moksh.walletwizzard.enums.AccountType.LIABILITY
+                    ? share : share.negate();
+            accountNetBalance = accountNetBalance.add(contribution);
+        }
+
         return new PersonBalanceDto(
                 person.getId(), person.getName(),
-                directDebts, loanViews,
-                directNetBalance.add(loanNetBalance)
+                directDebts, loanViews, accountViews,
+                directNetBalance.add(loanNetBalance).add(accountNetBalance)
         );
     }
 
