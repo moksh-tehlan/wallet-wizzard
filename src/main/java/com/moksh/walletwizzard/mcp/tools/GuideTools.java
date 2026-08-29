@@ -172,37 +172,38 @@ public class GuideTools {
                 Tracks MF, EPF, FD, and RD. Market values are computed/fetched live.
                 Investment gains appear separately in get_net_worth as investmentGains.
 
-                Flow — Mutual Fund:
+                Flow — Mutual Fund (lump sum):
                   1. search_mutual_fund(query="Axis Bluechip") → pick schemeCode
                   2. add_investment(type=MUTUAL_FUND, schemeCode, units, amount, bankAccountId)
                      → live NAV fetched immediately, currentValue = units × NAV
                   3. refresh_investment_values() anytime for updated NAV
-                  4. record_investment_contribution(investmentId, amount, unitsAdded) for manual SIP
-                  5. close_investment(investmentId, bankAccountId) on redemption
+                  4. close_investment(investmentId, bankAccountId) on redemption
+
+                Flow — Mutual Fund SIP (auto):
+                  1. search_mutual_fund → pick schemeCode
+                  2. add_investment(type=MUTUAL_FUND, schemeCode, units, amount, bankAccountId, monthlyContribution=5000)
+                     → both bankAccountId and monthlyContribution enable auto-SIP from day one
+                     → scheduler debits bankAccountId monthly, computes units from live NAV automatically
 
                 Flow — FD:
                   1. add_investment(type=FD, amount=principal, interestRate=0.07, maturityDate, bankAccountId)
                   2. refresh_investment_values() → value recomputed using quarterly compounding
                   3. close_investment(investmentId, bankAccountId) on maturity
 
-                Flow — RD (manual):
+                Flow — RD (auto, recommended):
                   1. add_investment(type=RD, amount=firstInstallment, interestRate, monthlyContribution, maturityDate, bankAccountId)
-                  2. record_investment_contribution(investmentId, amount, bankAccountId) each month
-                  3. close_investment(investmentId, bankAccountId) on maturity
-
-                Flow — RD (auto-contribute):
-                  1. add_investment(type=RD, amount=firstInstallment, interestRate, monthlyContribution, maturityDate, bankAccountId)
-                     → when both monthlyContribution AND bankAccountId are provided, nextContributionDate is set automatically
-                     → daily 06:00 scheduler debits bankAccountId each month — no manual action needed
-                  OR for an existing RD: set_investment_auto_contribute(investmentId, bankAccountId)
+                     → bankAccountId + monthlyContribution enable auto-contribute from day one
+                     → scheduler debits bankAccountId every month — nothing else needed
+                  2. close_investment(investmentId, bankAccountId) on maturity
 
                 Flow — EPF:
                   1. add_investment(type=EPF, amount=currentBalance, interestRate=0.0825)
-                     bankAccountId optional — omit for existing EPF balance (no bank debit)
-                  2. record_investment_contribution(investmentId, amount) each month for deductions
+                     omit bankAccountId for existing payroll balance — no auto-debit
+                  2. record_investment_contribution(investmentId, amount) manually each month
                   3. refresh_investment_values() → value recomputed with compound interest
 
                 interestRate: decimal — 0.07 = 7%, 0.0825 = 8.25% (EPF default)
+                To configure auto-contribute on an existing investment: set_investment_auto_contribute(investmentId, bankAccountId)
 
                 ## Auto-Pay Scheduler
 

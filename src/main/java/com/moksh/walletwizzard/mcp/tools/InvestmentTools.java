@@ -52,16 +52,21 @@ public class InvestmentTools {
 
                     MUTUAL_FUND — requires schemeCode (from search_mutual_fund) and units.
                       Live NAV fetched from mfapi.in automatically.
+                      For SIP: also pass monthlyContribution — auto-SIP is then enabled from day one.
+                      Every month the scheduler debits bankAccountId and records the contribution
+                      (units computed from live NAV automatically).
 
                     EPF — Employee Provident Fund. Use current EPF balance as amount.
                       interestRate defaults to 0.0825 (8.25%). bankAccountId optional (existing balance).
-                      monthlyContribution: set if you want to track ongoing deductions.
+                      monthlyContribution: omit for EPF (payroll-deducted, not auto-debited).
 
                     FD  — Fixed Deposit. Requires interestRate (e.g. 0.07 = 7%), maturityDate.
-                      bankAccountId is the account the FD was funded from.
+                      bankAccountId is the account the FD was funded from. No auto-contribute (FDs are one-shot).
 
                     RD  — Recurring Deposit. Requires interestRate, monthlyContribution, maturityDate.
                       amount = first installment amount.
+                      bankAccountId + monthlyContribution together enable auto-contribute from day one —
+                      the scheduler debits bankAccountId every month automatically. No extra setup.
 
                     interestRate: decimal — 0.07 = 7%, 0.0825 = 8.25%
                     """,
@@ -74,10 +79,10 @@ public class InvestmentTools {
             @McpArg(name = "schemeCode", description = "MF only: scheme code from search_mutual_fund", required = false) String schemeCode,
             @McpArg(name = "units", description = "MF only: units held", required = false) String units,
             @McpArg(name = "interestRate", description = "EPF/FD/RD: annual rate as decimal (0.07 = 7%)", required = false) String interestRate,
-            @McpArg(name = "monthlyContribution", description = "EPF/RD: monthly installment amount", required = false) String monthlyContribution,
+            @McpArg(name = "monthlyContribution", description = "RD/MF SIP: monthly contribution amount. Providing this + bankAccountId enables auto-contribute from day one.", required = false) String monthlyContribution,
             @McpArg(name = "startDate", description = "Start date YYYY-MM-DD (defaults to today)", required = false) String startDate,
             @McpArg(name = "maturityDate", description = "FD/RD: maturity date YYYY-MM-DD", required = false) String maturityDate,
-            @McpArg(name = "bankAccountId", description = "Bank account to debit (null for existing EPF balance)", required = false) String bankAccountId,
+            @McpArg(name = "bankAccountId", description = "Bank account to debit for initial investment. For RD/SIP: also used for monthly auto-contribute. Omit for EPF existing balance.", required = false) String bankAccountId,
             @McpArg(name = "notes", description = "Optional notes", required = false) String notes
     ) {
         InvestmentType invType = McpInputs.requireEnum(type, "type", InvestmentType.class);
