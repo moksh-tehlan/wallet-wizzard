@@ -35,6 +35,7 @@ public class GuideTools {
                   Expense Groups:    create_expense_group, add_group_member, add_group_expense, list_groups, list_group_expenses, get_group_balance, settle_group_member
                   Shared Liabilities: add_account_participant, list_account_participants, get_account_share_summary
                   Scheduler:         trigger_auto_pay
+                  Admin:             reset_account
 
                 ## Accounts
 
