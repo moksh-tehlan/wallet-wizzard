@@ -246,7 +246,26 @@ public class ReportingService {
         String invSql = "SELECT COALESCE(SUM(current_value), 0) FROM investments";
         BigDecimal investments = decimal(em.createNativeQuery(invSql).getSingleResult());
 
-        return LiquidNetWorthDto.of(today, cashAndBanks, receivables, investments, creditCards, otherLiab);
+        // What account participants owe you: their share% of each shared liability's balance
+        String participantSql = """
+                SELECT COALESCE(SUM(bal.balance * ap.share_percent / 100.0), 0)
+                FROM account_participants ap
+                JOIN accounts a ON a.id = ap.account_id
+                JOIN (
+                    SELECT jel.account_id,
+                           SUM(CASE WHEN jel.side = a2.normal_balance
+                                    THEN jel.amount ELSE -jel.amount END) AS balance
+                    FROM journal_entry_lines jel
+                    JOIN accounts a2 ON jel.account_id = a2.id
+                    GROUP BY jel.account_id
+                ) bal ON bal.account_id = ap.account_id
+                WHERE a.type = 'LIABILITY'
+                  AND a.is_active = true
+                  AND bal.balance > 0
+                """;
+        BigDecimal participantReceivables = decimal(em.createNativeQuery(participantSql).getSingleResult());
+
+        return LiquidNetWorthDto.of(today, cashAndBanks, receivables, participantReceivables, investments, creditCards, otherLiab);
     }
 
     // ─────────────────────────────────────────────────────────────────────────
