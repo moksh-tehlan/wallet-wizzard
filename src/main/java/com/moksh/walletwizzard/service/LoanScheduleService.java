@@ -158,7 +158,7 @@ public class LoanScheduleService {
                 paymentDate,
                 "Installment #" + installment.getInstallmentNo() + " — " + loan.getName(),
                 EntryType.INSTALLMENT_PAYMENT,
-                loan.getId(),
+                installment.getId(),
                 buildInstallmentLines(installment, loan, bankAccountId)
         ));
 
