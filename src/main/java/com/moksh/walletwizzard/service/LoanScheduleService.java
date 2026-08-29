@@ -174,6 +174,17 @@ public class LoanScheduleService {
     // ── Participants ─────────────────────────────────────────────────────────
 
     @Transactional
+    @Transactional
+    public LoanParticipant settleParticipantShare(UUID loanId, UUID personId, BigDecimal amount) {
+        LoanParticipant participant = participantRepository.findByLoanIdAndPersonId(loanId, personId)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Participant not found for loan " + loanId + " and person " + personId));
+        BigDecimal current = participant.getSettledAmount() != null ? participant.getSettledAmount() : BigDecimal.ZERO;
+        participant.setSettledAmount(current.add(amount));
+        log.info("Settled ₹{} for participant {} on loan {}", amount, personId, loanId);
+        return participantRepository.save(participant);
+    }
+
     public LoanParticipant addParticipant(UUID loanId, UUID personId, BigDecimal sharePercent, String notes) {
         Loan loan = requireLoan(loanId);
         Person person = personService.getById(personId);
@@ -224,13 +235,18 @@ public class LoanScheduleService {
         List<LoanShareSummaryDto.ParticipantShareDto> participantDtos = participants.stream()
                 .map(p -> {
                     BigDecimal factor = p.getSharePercent().divide(BigDecimal.valueOf(100), 10, RoundingMode.HALF_UP);
+                    BigDecimal paid = paidTotal.multiply(factor).setScale(2, RoundingMode.HALF_UP);
+                    BigDecimal settled = p.getSettledAmount() != null ? p.getSettledAmount() : BigDecimal.ZERO;
+                    BigDecimal outstanding = paid.subtract(settled).max(BigDecimal.ZERO);
                     return new LoanShareSummaryDto.ParticipantShareDto(
                             p.getId(),
                             p.getPerson().getId(),
                             p.getPerson().getName(),
                             p.getSharePercent(),
                             totalScheduled.multiply(factor).setScale(2, RoundingMode.HALF_UP),
-                            paidTotal.multiply(factor).setScale(2, RoundingMode.HALF_UP),
+                            paid,
+                            settled,
+                            outstanding,
                             dueTotal.multiply(factor).setScale(2, RoundingMode.HALF_UP),
                             scheduledTotal.multiply(factor).setScale(2, RoundingMode.HALF_UP)
                     );
@@ -301,7 +317,8 @@ public class LoanScheduleService {
             ));
 
             // For TAKEN loans: participant owes user (positive); GIVEN: user owes participant (negative)
-            BigDecimal owedByPerson = paidByUser.add(currentlyDue);
+            BigDecimal settled = p.getSettledAmount() != null ? p.getSettledAmount() : BigDecimal.ZERO;
+            BigDecimal owedByPerson = paidByUser.subtract(settled).max(BigDecimal.ZERO).add(currentlyDue);
             if (p.getLoan().getDirection() == LoanDirection.GIVEN) owedByPerson = owedByPerson.negate();
             loanNetBalance = loanNetBalance.add(owedByPerson);
         }

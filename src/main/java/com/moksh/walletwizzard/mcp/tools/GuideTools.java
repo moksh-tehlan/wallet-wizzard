@@ -26,7 +26,7 @@ public class GuideTools {
                   Debts:             add_debt, list_debts, get_debt_summary, settle_debt
                   Loans:             add_loan, record_loan_payment, list_loans, get_loan_summary, set_loan_auto_pay
                   Loan Schedules:    generate_loan_schedule, import_loan_schedule, get_loan_schedule, pay_installment
-                  Loan Participants: add_loan_participant, get_loan_share_summary
+                  Loan Participants: add_loan_participant, get_loan_share_summary, settle_loan_participant
                   Upcoming:          get_upcoming_loan_payments, get_upcoming_bills
                   People:            add_person, list_people, update_person
                   Person Balance:    get_person_balance

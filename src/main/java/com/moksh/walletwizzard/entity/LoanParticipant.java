@@ -37,5 +37,10 @@ public class LoanParticipant extends Auditable {
     @Column(nullable = false, precision = 5, scale = 2)
     private BigDecimal sharePercent;
 
+    /** Cumulative amount the participant has already paid back to the user. */
+    @Column(nullable = false, precision = 18, scale = 2)
+    @Builder.Default
+    private BigDecimal settledAmount = BigDecimal.ZERO;
+
     private String notes;
 }

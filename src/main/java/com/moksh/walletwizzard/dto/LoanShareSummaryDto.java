@@ -17,6 +17,8 @@ public record LoanShareSummaryDto(
             BigDecimal sharePercent,
             BigDecimal totalShareAmount,
             BigDecimal paidShareAmount,
+            BigDecimal settledAmount,
+            BigDecimal outstandingShareAmount,
             BigDecimal dueShareAmount,
             BigDecimal remainingShareAmount
     ) {}

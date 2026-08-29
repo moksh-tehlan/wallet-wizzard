@@ -165,6 +165,39 @@ public class LoanScheduleTools {
     }
 
     @McpTool(
+            name = "settle_loan_participant",
+            description = """
+                    Records that a loan participant has paid you back some or all of what they owe.
+                    Adds the amount to their settledAmount, reducing their outstandingShareAmount in
+                    get_loan_share_summary and their netBalance in get_person_balance.
+
+                    Use this when a co-borrower hands you cash or transfers money to settle their
+                    accumulated EMI share. This does NOT create a journal entry — it only updates the
+                    tracking counter. If you want the bank account to reflect the receipt, also use
+                    record_transaction or settle_debt.
+
+                    Call get_loan_share_summary(loanId) first to see how much they currently owe.
+                    """,
+            annotations = @McpTool.McpAnnotations(readOnlyHint = false, destructiveHint = false)
+    )
+    public LoanShareSummaryDto settleParticipantShare(
+            @McpArg(name = "loanId", description = "UUID of the loan", required = true) String loanId,
+            @McpArg(name = "personId", description = "UUID of the person (participant)", required = true) String personId,
+            @McpArg(name = "amount", description = "Amount they have paid you back (positive number)", required = true) String amount
+    ) {
+        BigDecimal settled = McpInputs.requireAmount(amount, "amount");
+        if (settled.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new com.moksh.walletwizzard.exception.InvalidInputException("amount must be positive, got: " + settled);
+        }
+        loanScheduleService.settleParticipantShare(
+                McpInputs.requireUuid(loanId, "loanId"),
+                McpInputs.requireUuid(personId, "personId"),
+                settled
+        );
+        return loanScheduleService.getShareSummary(McpInputs.requireUuid(loanId, "loanId"));
+    }
+
+    @McpTool(
             name = "get_upcoming_loan_payments",
             description = """
                     Lists loan installments due within the next N days.
