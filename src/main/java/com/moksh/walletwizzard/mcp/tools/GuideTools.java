@@ -33,7 +33,7 @@ public class GuideTools {
                   Recurring:         add_recurring_transaction, record_recurring_payment, list_recurring_transactions, update_recurring_transaction_status, get_upcoming_bills
                   Investments:       search_mutual_fund, add_investment, record_investment_contribution, refresh_investment_values, get_portfolio, close_investment, get_upcoming_maturities, set_investment_auto_contribute
                   Expense Groups:    create_expense_group, add_group_member, add_group_expense, list_groups, list_group_expenses, get_group_balance, settle_group_member
-                  Shared Liabilities: add_account_participant, list_account_participants, get_account_share_summary
+                  Shared Liabilities: add_account_participant, remove_account_participant, list_account_participants, get_account_share_summary
                   Scheduler:         trigger_auto_pay
                   Admin:             reset_account
 

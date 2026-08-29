@@ -75,6 +75,15 @@ public class AccountParticipantService {
                 accountId, account.getName(), account.getType().name(), balance, views);
     }
 
+    @Transactional
+    public void removeParticipant(UUID accountId, UUID personId) {
+        if (!repository.existsByAccountIdAndPersonId(accountId, personId)) {
+            throw new ResourceNotFoundException("Participant not found for account " + accountId + " and person " + personId);
+        }
+        repository.deleteByAccountIdAndPersonId(accountId, personId);
+        log.info("Removed participant {} from account {}", personId, accountId);
+    }
+
     public List<AccountParticipant> getParticipantsForPerson(UUID personId) {
         return repository.findByPersonIdWithAccount(personId);
     }

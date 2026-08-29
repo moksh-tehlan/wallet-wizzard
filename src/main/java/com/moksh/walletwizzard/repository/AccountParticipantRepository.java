@@ -16,4 +16,6 @@ public interface AccountParticipantRepository extends JpaRepository<AccountParti
     List<AccountParticipant> findByPersonIdWithAccount(UUID personId);
 
     boolean existsByAccountIdAndPersonId(UUID accountId, UUID personId);
+
+    void deleteByAccountIdAndPersonId(UUID accountId, UUID personId);
 }

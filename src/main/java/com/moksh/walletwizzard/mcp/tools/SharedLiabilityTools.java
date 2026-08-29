@@ -73,6 +73,27 @@ public class SharedLiabilityTools {
     }
 
     @McpTool(
+            name = "remove_account_participant",
+            description = """
+                    Removes a co-borrower/participant from an account.
+                    Use this when someone's share should no longer be tracked dynamically
+                    against the account balance — e.g. when you want to convert their
+                    outstanding share to a fixed direct debt via add_debt instead.
+                    """,
+            annotations = @McpTool.McpAnnotations(readOnlyHint = false, destructiveHint = true)
+    )
+    public String removeAccountParticipant(
+            @McpArg(name = "accountId", description = "UUID of the account", required = true) String accountId,
+            @McpArg(name = "personId", description = "UUID of the person to remove", required = true) String personId
+    ) {
+        accountParticipantService.removeParticipant(
+                McpInputs.requireUuid(accountId, "accountId"),
+                McpInputs.requireUuid(personId, "personId")
+        );
+        return "Participant removed from account " + accountId + ".";
+    }
+
+    @McpTool(
             name = "list_account_participants",
             description = "Lists all co-borrowers/participants for a given account with their share percentages.",
             annotations = @McpTool.McpAnnotations(readOnlyHint = true)
