@@ -21,5 +21,7 @@ public record RecordTransactionRequest(
         UUID referenceId,
 
         @NotNull @Size(min = 2, message = "A journal entry must have at least two lines.")
-        List<@Valid LineRequest> lines
+        List<@Valid LineRequest> lines,
+
+        String merchant
 ) {}

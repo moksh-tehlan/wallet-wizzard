@@ -94,7 +94,7 @@ public class SubscriptionService {
                 "Recurring — " + sub.getName(),
                 EntryType.SUBSCRIPTION,
                 null,
-                lines));
+                lines, null));
 
         LocalDate base = sub.getNextBillingDate() != null ? sub.getNextBillingDate() : paymentDate;
         LocalDate nextDate = sub.getScheduleType().applyTo(sub.getBillingCycle().advance(base));

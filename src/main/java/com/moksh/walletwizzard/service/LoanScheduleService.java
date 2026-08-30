@@ -159,7 +159,7 @@ public class LoanScheduleService {
                 "Installment #" + installment.getInstallmentNo() + " — " + loan.getName(),
                 EntryType.INSTALLMENT_PAYMENT,
                 installment.getId(),
-                buildInstallmentLines(installment, loan, bankAccountId)
+                buildInstallmentLines(installment, loan, bankAccountId), null
         ));
 
         installment.setStatus(InstallmentStatus.PAID);

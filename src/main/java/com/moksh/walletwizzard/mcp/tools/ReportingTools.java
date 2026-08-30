@@ -9,6 +9,7 @@ import com.moksh.walletwizzard.reporting.dto.LiquidNetWorthDto;
 import com.moksh.walletwizzard.reporting.dto.NetWorthDto;
 import com.moksh.walletwizzard.reporting.dto.SpendingAverageDto;
 import com.moksh.walletwizzard.reporting.dto.SpendingByCategoryDto;
+import com.moksh.walletwizzard.reporting.dto.SpendingByMerchantDto;
 import lombok.RequiredArgsConstructor;
 import org.springframework.ai.mcp.annotation.McpArg;
 import org.springframework.ai.mcp.annotation.McpTool;
@@ -81,6 +82,31 @@ public class ReportingTools {
             @McpArg(name = "to", description = "End date YYYY-MM-DD (optional)", required = false) String to
     ) {
         return reportingService.getSpendingByCategory(
+                McpInputs.parseDate(from, "from"),
+                McpInputs.parseDate(to, "to")
+        );
+    }
+
+    @McpTool(
+            name = "get_spending_by_merchant",
+            description = """
+                    Breaks down expenses by merchant/vendor for a period.
+                    Only transactions logged with a merchant field are included.
+                    Results ordered by amount descending, each with percentage of merchant-tagged total.
+
+                    Useful for: 'How much did I spend on Zomato this month?'
+                               'Which app am I spending most on?'
+                               'Compare Blinkit vs Zepto spend'
+
+                    Use with from/to for a specific period, or omit for all-time.
+                    """,
+            annotations = @McpTool.McpAnnotations(readOnlyHint = true)
+    )
+    public List<SpendingByMerchantDto> getSpendingByMerchant(
+            @McpArg(name = "from", description = "Start date YYYY-MM-DD (optional)", required = false) String from,
+            @McpArg(name = "to", description = "End date YYYY-MM-DD (optional)", required = false) String to
+    ) {
+        return reportingService.getSpendingByMerchant(
                 McpInputs.parseDate(from, "from"),
                 McpInputs.parseDate(to, "to")
         );

@@ -6,6 +6,7 @@ public record TransactionView(
         String id,
         String date,
         String description,
+        String merchant,
         String entryType,
         List<LineView> lines
 ) {}

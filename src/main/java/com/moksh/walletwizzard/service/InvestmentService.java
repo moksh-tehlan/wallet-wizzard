@@ -107,7 +107,7 @@ public class InvestmentService {
             // null referenceId: nextContributionDate advancement is the idempotency guard
             accountingService.record(new RecordTransactionRequest(
                     LocalDate.now(), "Contribution — " + inv.getName(),
-                    EntryType.TRANSFER, null, lines));
+                    EntryType.TRANSFER, null, lines, null));
         }
 
         inv.setInvestedAmount(inv.getInvestedAmount().add(amount));
@@ -159,7 +159,7 @@ public class InvestmentService {
                 EntryType.TRANSFER, inv.getId(),
                 List.of(
                         new LineRequest(bankAccountId, balance, EntrySide.DEBIT, "Investment proceeds"),
-                        new LineRequest(inv.getAccount().getId(), balance, EntrySide.CREDIT, null))));
+                        new LineRequest(inv.getAccount().getId(), balance, EntrySide.CREDIT, null)), null));
 
         log.info("Closed investment '{}', returned {} to bank", inv.getName(), balance);
         return inv;
@@ -268,13 +268,13 @@ public class InvestmentService {
                     date, "Investment — " + req.name(), EntryType.TRANSFER, null,
                     List.of(
                             new LineRequest(investmentAccountId, req.amount(), EntrySide.DEBIT, null),
-                            new LineRequest(req.bankAccountId(), req.amount(), EntrySide.CREDIT, null))));
+                            new LineRequest(req.bankAccountId(), req.amount(), EntrySide.CREDIT, null)), null));
         } else {
             // EPF existing balance: single-sided opening — use OPENING_BALANCE to establish account
             accountingService.record(new RecordTransactionRequest(
                     date, "Opening balance — " + req.name(), EntryType.OPENING_BALANCE, null,
                     List.of(new LineRequest(investmentAccountId, req.amount(), EntrySide.DEBIT, null),
-                            new LineRequest(investmentAccountId, req.amount(), EntrySide.CREDIT, "Opening"))));
+                            new LineRequest(investmentAccountId, req.amount(), EntrySide.CREDIT, "Opening")), null));
         }
     }
 
@@ -283,7 +283,7 @@ public class InvestmentService {
         accountingService.record(new RecordTransactionRequest(
                 LocalDate.now(), "Contribution — " + inv.getName(), EntryType.ADJUSTMENT, inv.getId(),
                 List.of(new LineRequest(inv.getAccount().getId(), amount, EntrySide.DEBIT, "Contribution"),
-                        new LineRequest(inv.getAccount().getId(), amount, EntrySide.CREDIT, "Contribution offset"))));
+                        new LineRequest(inv.getAccount().getId(), amount, EntrySide.CREDIT, "Contribution offset")), null));
     }
 
     private Investment requireInvestment(UUID id) {

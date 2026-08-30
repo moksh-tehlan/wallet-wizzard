@@ -69,7 +69,7 @@ public class DebtService {
 
         accountingService.record(new RecordTransactionRequest(
                 entryDate, description, EntryType.OPENING_BALANCE, null,
-                buildDebtLines(request, debtAccount.getId())));
+                buildDebtLines(request, debtAccount.getId()), null));
 
         User userRef = entityManager.getReference(User.class, TenantContext.getCurrentUser());
         DebtRecord record = DebtRecord.builder()
@@ -136,7 +136,7 @@ public class DebtService {
                 "Debt settlement — " + record.getPerson().getName(),
                 EntryType.DEBT_SETTLEMENT,
                 record.getId(),
-                lines
+                lines, null
         ));
 
         log.info("Settled {}  debt {} amount={}", record.getDirection(), debtId, amount);

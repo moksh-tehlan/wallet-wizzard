@@ -53,6 +53,7 @@ public class AccountingService {
                 .user(userRef)
                 .date(request.date())
                 .description(request.description())
+                .merchant(request.merchant())
                 .entryType(request.entryType())
                 .referenceId(request.referenceId())
                 .build();
@@ -102,7 +103,7 @@ public class AccountingService {
                 "VOID — " + original.getDescription(),
                 EntryType.ADJUSTMENT,
                 null,
-                reversed));
+                reversed, null));
     }
 
     // ── Private helpers ──────────────────────────────────────────────────────

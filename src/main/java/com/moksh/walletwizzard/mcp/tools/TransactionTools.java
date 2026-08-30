@@ -59,7 +59,9 @@ public class TransactionTools {
             @McpArg(name = "lines", description = "List of journal entry lines. Each line: {accountId, amount, side (DEBIT|CREDIT), memo}", required = true)
             List<LineInput> lines,
             @McpArg(name = "referenceId", description = "UUID of a related loan/subscription/debt record (optional)", required = false)
-            String referenceId
+            String referenceId,
+            @McpArg(name = "merchant", description = "Merchant or vendor name e.g. ZOMATO, BLINKIT, AMAZON (optional). Used for get_spending_by_merchant.", required = false)
+            String merchant
     ) {
         List<LineRequest> lineRequests = lines.stream()
                 .map(l -> new LineRequest(
@@ -75,7 +77,8 @@ public class TransactionTools {
                 description,
                 McpInputs.requireEnum(entryType, "entryType", EntryType.class),
                 McpInputs.parseUuid(referenceId, "referenceId"),
-                lineRequests
+                lineRequests,
+                McpInputs.blankToNull(merchant)
         ));
         return "Transaction recorded: id=" + entry.getId()
                 + ", date=" + entry.getDate()
@@ -115,6 +118,7 @@ public class TransactionTools {
                         e.getId().toString(),
                         e.getDate().toString(),
                         e.getDescription(),
+                        e.getMerchant(),
                         e.getEntryType().name(),
                         e.getLines().stream().map(l -> new LineView(
                                 l.getAccount().getId().toString(),

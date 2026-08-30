@@ -34,6 +34,9 @@ public class JournalEntry extends Auditable {
     @Column(nullable = false)
     private String description;
 
+    @Column
+    private String merchant;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, updatable = false)
     private EntryType entryType;

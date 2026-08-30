@@ -10,6 +10,7 @@ import com.moksh.walletwizzard.reporting.dto.LiquidNetWorthDto;
 import com.moksh.walletwizzard.reporting.dto.NetWorthDto;
 import com.moksh.walletwizzard.reporting.dto.SpendingAverageDto;
 import com.moksh.walletwizzard.reporting.dto.SpendingByCategoryDto;
+import com.moksh.walletwizzard.reporting.dto.SpendingByMerchantDto;
 import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -118,6 +119,51 @@ public class ReportingService {
                         UUID.fromString((String) r[0]),
                         (String) r[1],
                         decimal(r[2]),
+                        total))
+                .toList();
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Spending by Merchant
+    // ─────────────────────────────────────────────────────────────────────────
+
+    public List<SpendingByMerchantDto> getSpendingByMerchant(LocalDate from, LocalDate to) {
+        String sql = """
+                SELECT
+                    je.merchant,
+                    COALESCE(SUM(
+                        CASE WHEN jel.side = a.normal_balance THEN jel.amount ELSE -jel.amount END
+                    ), 0) AS amount,
+                    COUNT(DISTINCT je.id) AS txn_count
+                FROM journal_entry_lines jel
+                JOIN accounts       a  ON jel.account_id       = a.id
+                JOIN journal_entries je ON jel.journal_entry_id = je.id
+                WHERE a.type = 'EXPENSE'
+                  AND je.merchant IS NOT NULL
+                  AND (:from IS NULL OR je.date >= CAST(:from AS date))
+                  AND (:to   IS NULL OR je.date <= CAST(:to   AS date))
+                GROUP BY je.merchant
+                HAVING COALESCE(SUM(
+                    CASE WHEN jel.side = a.normal_balance THEN jel.amount ELSE -jel.amount END
+                ), 0) > 0
+                ORDER BY amount DESC
+                """;
+
+        @SuppressWarnings("unchecked")
+        List<Object[]> rows = em.createNativeQuery(sql)
+                .setParameter("from", from)
+                .setParameter("to", to)
+                .getResultList();
+
+        BigDecimal total = rows.stream()
+                .map(r -> decimal(r[1]))
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        return rows.stream()
+                .map(r -> SpendingByMerchantDto.of(
+                        (String) r[0],
+                        decimal(r[1]),
+                        ((Number) r[2]).intValue(),
                         total))
                 .toList();
     }

@@ -136,7 +136,7 @@ public class ExpenseGroupService {
                         List.of(
                                 new LineRequest(expenseAccountId, totalAmount, EntrySide.DEBIT, null),
                                 new LineRequest(bankAccountId, totalAmount, EntrySide.CREDIT, null)
-                        )
+                        ), null
                 ));
                 expense.setJournalEntryId(je.getId());
             }
@@ -278,7 +278,7 @@ public class ExpenseGroupService {
                     List.of(
                             new LineRequest(bankAccountId, settleAmount, EntrySide.DEBIT, "Received from " + person.getName()),
                             new LineRequest(reimbAccount.getId(), settleAmount, EntrySide.CREDIT, "Group reimbursement")
-                    )
+                    ), null
             ));
             markSettled(owedByPerson, settleAmount, settleDate);
         } else {
@@ -290,7 +290,7 @@ public class ExpenseGroupService {
                     List.of(
                             new LineRequest(reimbAccount.getId(), settleAmount, EntrySide.DEBIT, "Paid to " + person.getName()),
                             new LineRequest(bankAccountId, settleAmount, EntrySide.CREDIT, "Group settlement payment")
-                    )
+                    ), null
             ));
             markSettled(owedToPerson, settleAmount, settleDate);
         }

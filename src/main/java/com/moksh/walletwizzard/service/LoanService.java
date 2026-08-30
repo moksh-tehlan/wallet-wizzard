@@ -60,7 +60,7 @@ public class LoanService {
                 request.startDate() != null ? request.startDate() : LocalDate.now(),
                 "Loan disbursement — " + request.name(),
                 EntryType.OPENING_BALANCE, null,
-                buildDisbursementLines(request, loanAccount.getId())));
+                buildDisbursementLines(request, loanAccount.getId()), null));
 
         User userRef = entityManager.getReference(User.class, TenantContext.getCurrentUser());
         Account defaultBankAccount = entityManager.getReference(Account.class, request.bankAccountId());
@@ -94,7 +94,7 @@ public class LoanService {
                 "Loan payment — " + loan.getName(),
                 EntryType.LOAN_PAYMENT,
                 loan.getId(),
-                buildPaymentLines(request, loan)));
+                buildPaymentLines(request, loan), null));
 
         log.info("Recorded payment for loan '{}'", loan.getName());
     }
