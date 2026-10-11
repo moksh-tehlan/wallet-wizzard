@@ -40,4 +40,9 @@ public interface GroupExpenseSplitRepository extends JpaRepository<GroupExpenseS
             ORDER BY e.date, s.createdAt
             """)
     List<GroupExpenseSplit> findUnsettledSplitsOwedToPerson(UUID groupId, UUID personId);
+
+    void deleteByExpenseId(UUID expenseId);
+
+    @Query("SELECT s.expense.id FROM GroupExpenseSplit s JOIN s.expense e WHERE e.group.id = :groupId")
+    List<UUID> findExpenseIdsByGroupId(UUID groupId);
 }

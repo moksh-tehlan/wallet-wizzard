@@ -17,8 +17,13 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -227,6 +232,149 @@ public class ExpenseGroupService {
                 .toList();
 
         return new GroupBalanceDto(groupId, group.getName(), balances);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Delete expense / group
+    // ─────────────────────────────────────────────────────────────────────────
+
+    @Transactional
+    public String deleteGroupExpense(UUID expenseId) {
+        GroupExpense expense = expenseRepo.findById(expenseId)
+                .orElseThrow(() -> new ResourceNotFoundException("Group expense", expenseId));
+        if (expense.getJournalEntryId() != null) {
+            accountingService.voidEntry(expense.getJournalEntryId());
+        }
+        splitRepo.deleteByExpenseId(expenseId);
+        expenseRepo.deleteById(expenseId);
+        log.info("Deleted group expense '{}' ({})", expense.getDescription(), expenseId);
+        return "Deleted expense '" + expense.getDescription() + "' (₹" + expense.getTotalAmount().toPlainString() + ")."
+                + (expense.getJournalEntryId() != null ? " Journal entry voided." : "");
+    }
+
+    @Transactional
+    public String deleteGroup(UUID groupId) {
+        ExpenseGroup group = requireGroup(groupId);
+        List<GroupExpense> expenses = expenseRepo.findByGroupIdOrderByDateDesc(groupId);
+        int voided = 0;
+        for (GroupExpense expense : expenses) {
+            if (expense.getJournalEntryId() != null) {
+                accountingService.voidEntry(expense.getJournalEntryId());
+                voided++;
+            }
+            splitRepo.deleteByExpenseId(expense.getId());
+        }
+        expenseRepo.deleteAll(expenses);
+        memberRepo.deleteByGroupId(groupId);
+        group.setActive(false);
+        groupRepo.save(group);
+        log.info("Deleted group '{}' ({}) — {} expenses removed, {} journal entries voided",
+                group.getName(), groupId, expenses.size(), voided);
+        return "Group '" + group.getName() + "' deleted. "
+                + expenses.size() + " expenses removed, " + voided + " journal entries voided.";
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Simplified settlement
+    // ─────────────────────────────────────────────────────────────────────────
+
+    public GroupSettlementDto getSimplifiedSettlement(UUID groupId) {
+        ExpenseGroup group = requireGroup(groupId);
+        List<GroupMember> members = memberRepo.findByGroupIdWithPerson(groupId);
+        List<GroupExpense> expenses = expenseRepo.findByGroupIdOrderByDateDesc(groupId);
+
+        int totalParticipants = members.size() + 1; // members + owner
+
+        // null key = owner; personId key = that member
+        Map<UUID, BigDecimal> net = new HashMap<>();
+        Map<UUID, String> names = new HashMap<>();
+        net.put(null, BigDecimal.ZERO);
+        names.put(null, "You");
+        for (GroupMember m : members) {
+            net.put(m.getPerson().getId(), BigDecimal.ZERO);
+            names.put(m.getPerson().getId(), m.getPerson().getName());
+        }
+        Set<UUID> memberIds = members.stream()
+                .map(m -> m.getPerson().getId())
+                .collect(Collectors.toSet());
+
+        BigDecimal totalExpenses = BigDecimal.ZERO;
+
+        for (GroupExpense expense : expenses) {
+            totalExpenses = totalExpenses.add(expense.getTotalAmount());
+            List<GroupExpenseSplit> splits = splitRepo.findByExpenseId(expense.getId());
+
+            BigDecimal perShare = expense.getTotalAmount()
+                    .divide(BigDecimal.valueOf(totalParticipants), 4, RoundingMode.HALF_UP);
+
+            if (expense.getPaidByPerson() == null) {
+                // Owner paid: each non-settled member split is a debt to owner
+                for (GroupExpenseSplit split : splits) {
+                    if (!split.isSettled() && split.getPerson() != null) {
+                        UUID memberId = split.getPerson().getId();
+                        net.merge(null, split.getShareAmount(), BigDecimal::add);
+                        net.merge(memberId, split.getShareAmount().negate(), BigDecimal::add);
+                    }
+                }
+            } else {
+                UUID payerId = expense.getPaidByPerson().getId();
+
+                // Owner's share (stored split with person=null)
+                BigDecimal ownerShare = splits.stream()
+                        .filter(s -> !s.isSettled() && s.getPerson() == null)
+                        .map(GroupExpenseSplit::getShareAmount)
+                        .reduce(BigDecimal.ZERO, BigDecimal::add);
+                if (ownerShare.compareTo(BigDecimal.ZERO) > 0) {
+                    net.merge(payerId, ownerShare, BigDecimal::add);
+                    net.merge(null, ownerShare.negate(), BigDecimal::add);
+                }
+
+                // Cross-member: each non-payer member owes payer perShare
+                // (not stored in DB, always treated as unsettled)
+                for (UUID memberId : memberIds) {
+                    if (!memberId.equals(payerId)) {
+                        net.merge(payerId, perShare, BigDecimal::add);
+                        net.merge(memberId, perShare.negate(), BigDecimal::add);
+                    }
+                }
+            }
+        }
+
+        // Greedy debt simplification: match largest debtor with largest creditor
+        Map<UUID, BigDecimal> balances = new HashMap<>(net);
+        BigDecimal threshold = new BigDecimal("0.01");
+        List<GroupSettlementDto.Payment> settlements = new ArrayList<>();
+
+        while (true) {
+            Optional<Map.Entry<UUID, BigDecimal>> maxCreditor = balances.entrySet().stream()
+                    .filter(e -> e.getValue().compareTo(threshold) > 0)
+                    .max(Map.Entry.comparingByValue());
+            Optional<Map.Entry<UUID, BigDecimal>> maxDebtor = balances.entrySet().stream()
+                    .filter(e -> e.getValue().compareTo(threshold.negate()) < 0)
+                    .min(Map.Entry.comparingByValue());
+
+            if (maxCreditor.isEmpty() || maxDebtor.isEmpty()) break;
+
+            UUID creditorId = maxCreditor.get().getKey();
+            UUID debtorId = maxDebtor.get().getKey();
+            BigDecimal credit = balances.get(creditorId);
+            BigDecimal debt = balances.get(debtorId).abs();
+            BigDecimal payment = credit.min(debt).setScale(2, RoundingMode.HALF_UP);
+
+            settlements.add(new GroupSettlementDto.Payment(
+                    names.get(debtorId), debtorId,
+                    names.get(creditorId), creditorId,
+                    payment));
+
+            balances.merge(creditorId, payment.negate(), BigDecimal::add);
+            balances.merge(debtorId, payment, BigDecimal::add);
+        }
+
+        BigDecimal perPersonShare = totalParticipants > 0
+                ? totalExpenses.divide(BigDecimal.valueOf(totalParticipants), 2, RoundingMode.HALF_UP)
+                : BigDecimal.ZERO;
+
+        return new GroupSettlementDto(groupId, group.getName(), totalExpenses, perPersonShare, settlements);
     }
 
     // ─────────────────────────────────────────────────────────────────────────

@@ -2,6 +2,7 @@ package com.moksh.walletwizzard.mcp.tools;
 
 import com.moksh.walletwizzard.dto.GroupBalanceDto;
 import com.moksh.walletwizzard.dto.GroupExpenseDto;
+import com.moksh.walletwizzard.dto.GroupSettlementDto;
 import com.moksh.walletwizzard.dto.GroupSummaryDto;
 import com.moksh.walletwizzard.entity.ExpenseGroup;
 import com.moksh.walletwizzard.mcp.McpInputs;
@@ -145,6 +146,61 @@ public class ExpenseGroupTools {
             @McpArg(name = "groupId", description = "UUID of the expense group", required = true) String groupId
     ) {
         return expenseGroupService.getGroupBalance(McpInputs.requireUuid(groupId, "groupId"));
+    }
+
+    @McpTool(
+            name = "delete_group_expense",
+            description = """
+                    Permanently deletes a single expense from a group.
+                    If the expense had a journal entry (i.e. you paid it), the entry is automatically voided
+                    so account balances are corrected. Member splits are removed.
+
+                    Use list_group_expenses to find the expenseId first.
+                    """,
+            annotations = @McpTool.McpAnnotations(readOnlyHint = false, destructiveHint = true)
+    )
+    public String deleteGroupExpense(
+            @McpArg(name = "expenseId", description = "UUID of the group expense to delete", required = true) String expenseId
+    ) {
+        return expenseGroupService.deleteGroupExpense(McpInputs.requireUuid(expenseId, "expenseId"));
+    }
+
+    @McpTool(
+            name = "delete_group",
+            description = """
+                    Permanently deletes an expense group and all its expenses, splits, and members.
+                    All journal entries created by your-paid expenses in the group are voided automatically.
+                    This cannot be undone.
+
+                    Use list_groups to find the groupId first.
+                    """,
+            annotations = @McpTool.McpAnnotations(readOnlyHint = false, destructiveHint = true)
+    )
+    public String deleteGroup(
+            @McpArg(name = "groupId", description = "UUID of the expense group to delete", required = true) String groupId
+    ) {
+        return expenseGroupService.deleteGroup(McpInputs.requireUuid(groupId, "groupId"));
+    }
+
+    @McpTool(
+            name = "get_group_settlement",
+            description = """
+                    Computes the minimal set of payments to fully settle a group — like Splitwise's 'Settle Up'.
+                    Returns exactly who pays whom and how much so that after all listed payments, every
+                    member's balance is zero.
+
+                    Unlike get_group_balance (which only shows your bilateral view), this tool includes
+                    cross-member debts (e.g. Shubham owes Om) and runs a greedy simplification so the
+                    fewest possible transactions settle everyone.
+
+                    Also returns totalExpenses and perPersonShare for the group.
+                    """,
+            annotations = @McpTool.McpAnnotations(readOnlyHint = true)
+    )
+    public GroupSettlementDto getGroupSettlement(
+            @McpArg(name = "groupId", description = "UUID of the expense group", required = true) String groupId
+    ) {
+        return expenseGroupService.getSimplifiedSettlement(McpInputs.requireUuid(groupId, "groupId"));
     }
 
     @McpTool(

@@ -33,7 +33,7 @@ public class GuideTools {
                   Person Balance:    get_person_balance
                   Recurring:         add_recurring_transaction, record_recurring_payment, list_recurring_transactions, update_recurring_transaction_status, get_upcoming_bills
                   Investments:       search_mutual_fund, add_investment, record_investment_contribution, refresh_investment_values, get_portfolio, close_investment, get_upcoming_maturities, set_investment_auto_contribute
-                  Expense Groups:    create_expense_group, add_group_member, add_group_expense, list_groups, list_group_expenses, get_group_balance, settle_group_member
+                  Expense Groups:    create_expense_group, add_group_member, add_group_expense, list_groups, list_group_expenses, get_group_balance, get_group_settlement, settle_group_member, delete_group_expense, delete_group
                   Shared Liabilities: add_account_participant, remove_account_participant, list_account_participants, get_account_share_summary
                   Scheduler:         trigger_auto_pay
                   Admin:             reset_account
@@ -161,9 +161,11 @@ public class GuideTools {
                   3. add_group_expense(groupId, description, totalAmount, expenseAccountId, bankAccountId) each time
                      → auto-splits equally: each member's share = totalAmount ÷ (members + 1)
                      → journal entry posted automatically when you pay (DEBIT expense, CREDIT bank)
-                  4. get_group_balance(groupId) → real-time balance per member
+                  4. get_group_balance(groupId) → your bilateral view per member
                      theyOweYou, youOweThem, net (positive = they owe you)
-                  5. settle_group_member(groupId, personId, bankAccountId) when someone pays up
+                  5. get_group_settlement(groupId) → minimal payment plan to settle everyone
+                     includes cross-member debts; returns who pays whom and how much
+                  6. settle_group_member(groupId, personId, bankAccountId) when someone pays up
                      → posts journal entry, marks their splits as settled
 
                 If someone else paid (not you): pass paidByPersonId, omit expenseAccountId + bankAccountId.
