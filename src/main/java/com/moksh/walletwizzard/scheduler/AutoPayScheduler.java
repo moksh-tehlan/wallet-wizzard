@@ -8,9 +8,11 @@ import com.moksh.walletwizzard.enums.InvestmentType;
 import com.moksh.walletwizzard.repository.InvestmentRepository;
 import com.moksh.walletwizzard.repository.LoanInstallmentRepository;
 import com.moksh.walletwizzard.repository.SubscriptionRepository;
+import com.moksh.walletwizzard.repository.UserRepository;
 import com.moksh.walletwizzard.service.InvestmentService;
 import com.moksh.walletwizzard.service.LoanScheduleService;
 import com.moksh.walletwizzard.service.MfNavService;
+import com.moksh.walletwizzard.service.NetWorthSnapshotService;
 import com.moksh.walletwizzard.service.SubscriptionService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -29,11 +31,13 @@ public class AutoPayScheduler {
     private final SubscriptionRepository subscriptionRepository;
     private final LoanInstallmentRepository installmentRepository;
     private final InvestmentRepository investmentRepository;
+    private final UserRepository userRepository;
 
     private final SubscriptionService subscriptionService;
     private final LoanScheduleService loanScheduleService;
     private final InvestmentService investmentService;
     private final MfNavService mfNavService;
+    private final NetWorthSnapshotService netWorthSnapshotService;
 
     /** Runs daily at 06:00 (after the 00:05 mark-due job). */
     @Scheduled(cron = "0 0 6 * * *")
@@ -44,6 +48,7 @@ public class AutoPayScheduler {
         processSubscriptions(today);
         processLoanInstallments(today);
         processInvestmentContributions(today);
+        recordNetWorthSnapshots(today);
 
         log.info("Auto-pay scheduler completed for {}", today);
     }
@@ -116,6 +121,16 @@ public class AutoPayScheduler {
                     investment.getName(), investment.getSchemeCode(), e.getMessage());
             return null;
         }
+    }
+
+    private void recordNetWorthSnapshots(LocalDate today) {
+        userRepository.findAll().forEach(user -> {
+            try {
+                withUser(user.getId(), () -> netWorthSnapshotService.recordSnapshot(user.getId()));
+            } catch (Exception e) {
+                log.error("Net worth snapshot failed for user {}: {}", user.getId(), e.getMessage());
+            }
+        });
     }
 
     private void withUser(java.util.UUID userId, Runnable task) {

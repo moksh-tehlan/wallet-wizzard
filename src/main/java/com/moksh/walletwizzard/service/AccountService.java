@@ -99,6 +99,11 @@ public class AccountService {
         return accountRepository.computeBalanceAsOf(accountId, asOfDate);
     }
 
+    public BigDecimal getSpendForAccount(UUID accountId, LocalDate from, LocalDate to) {
+        BigDecimal result = accountRepository.computeSpendForPeriod(accountId, from, to);
+        return result != null ? result : BigDecimal.ZERO;
+    }
+
     public Map<UUID, BigDecimal> getBalancesForAccounts(List<UUID> accountIds) {
         if (accountIds.isEmpty()) return Map.of();
         return accountRepository.computeBalancesForAccounts(accountIds).stream()

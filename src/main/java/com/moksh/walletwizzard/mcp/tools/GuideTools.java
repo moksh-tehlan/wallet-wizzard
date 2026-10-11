@@ -22,7 +22,8 @@ public class GuideTools {
                 ## Tool Index
                   Accounts:          get_account_types, add_account, rename_account, update_account, delete_account, list_accounts, get_account_balance
                   Transactions:      record_transaction, get_transactions, void_transaction
-                  Reporting:         get_cash_flow, get_net_worth, get_liquid_net_worth, get_monthly_report, get_spending_by_category, get_spending_by_merchant, get_spending_averages, get_monthly_trend, get_financial_year_summary
+                  Reporting:         get_cash_flow, get_net_worth, get_liquid_net_worth, get_monthly_report, get_spending_by_category, get_spending_by_merchant, get_spending_averages, get_monthly_trend, get_financial_year_summary, get_cash_flow_projection, get_net_worth_history, suggest_category_for_merchant, get_financial_health_score
+  Budgets:           set_budget, get_budget_status, delete_budget
                   Debts:             add_debt, list_debts, get_debt_summary, settle_debt
                   Loans:             add_loan, record_loan_payment, list_loans, get_loan_summary, set_loan_auto_pay
                   Loan Schedules:    generate_loan_schedule, import_loan_schedule, get_loan_schedule, pay_installment

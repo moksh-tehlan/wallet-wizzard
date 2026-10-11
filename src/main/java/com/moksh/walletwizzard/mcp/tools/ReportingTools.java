@@ -3,13 +3,18 @@ package com.moksh.walletwizzard.mcp.tools;
 import com.moksh.walletwizzard.mcp.McpInputs;
 import com.moksh.walletwizzard.reporting.ReportingService;
 import com.moksh.walletwizzard.reporting.dto.CashFlowDto;
+import com.moksh.walletwizzard.reporting.dto.CashFlowProjectionDto;
+import com.moksh.walletwizzard.reporting.dto.FinancialHealthDto;
+import com.moksh.walletwizzard.reporting.dto.MerchantCategorySuggestionDto;
 import com.moksh.walletwizzard.reporting.dto.MonthlyReportDto;
 import com.moksh.walletwizzard.reporting.dto.MonthlyTrendDto;
 import com.moksh.walletwizzard.reporting.dto.LiquidNetWorthDto;
 import com.moksh.walletwizzard.reporting.dto.NetWorthDto;
+import com.moksh.walletwizzard.reporting.dto.NetWorthHistoryDto;
 import com.moksh.walletwizzard.reporting.dto.SpendingAverageDto;
 import com.moksh.walletwizzard.reporting.dto.SpendingByCategoryDto;
 import com.moksh.walletwizzard.reporting.dto.SpendingByMerchantDto;
+import com.moksh.walletwizzard.service.NetWorthSnapshotService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.ai.mcp.annotation.McpArg;
 import org.springframework.ai.mcp.annotation.McpTool;
@@ -25,6 +30,7 @@ import java.util.Map;
 public class ReportingTools {
 
     private final ReportingService reportingService;
+    private final NetWorthSnapshotService netWorthSnapshotService;
 
     @McpTool(
             name = "get_cash_flow",
@@ -215,5 +221,92 @@ public class ReportingTools {
     ) {
         int m = months != null ? Math.min(Math.max(months, 1), 24) : 6;
         return reportingService.getMonthlyTrend(m);
+    }
+
+    @McpTool(
+            name = "get_cash_flow_projection",
+            description = """
+                    Projects your month-by-month cash balance for the next N months.
+                    Based on: current bank balance + upcoming recurring transactions (salary, bills)
+                    + scheduled loan EMIs.
+
+                    Each month shows:
+                      openingBalance  — balance at start of month
+                      totalInflows    — expected income (salary, recurring credits)
+                      totalOutflows   — expected bills + EMIs
+                      closingBalance  — projected end-of-month balance
+                      inflowItems / outflowItems — line-by-line breakdown
+
+                    months defaults to 3. Use this instead of manual calculations.
+                    Note: does not include variable expenses (food, shopping, etc.).
+                    """,
+            annotations = @McpTool.McpAnnotations(readOnlyHint = true)
+    )
+    public CashFlowProjectionDto getCashFlowProjection(
+            @McpArg(name = "months", description = "Number of months to project (default 3, max 12)", required = false) Integer months
+    ) {
+        int m = months != null ? Math.min(Math.max(months, 1), 12) : 3;
+        return reportingService.getCashFlowProjection(m);
+    }
+
+    @McpTool(
+            name = "get_net_worth_history",
+            description = """
+                    Returns historical net worth snapshots over the last N months.
+                    Snapshots are recorded daily by the auto-pay scheduler.
+                    Also shows total change in net worth (amount + %) over the period.
+
+                    Use this to answer: 'Is my wealth growing over time?'
+                    months defaults to 6.
+                    """,
+            annotations = @McpTool.McpAnnotations(readOnlyHint = true)
+    )
+    public NetWorthHistoryDto getNetWorthHistory(
+            @McpArg(name = "months", description = "Months of history to show (default 6, max 24)", required = false) Integer months
+    ) {
+        int m = months != null ? Math.min(Math.max(months, 1), 24) : 6;
+        return netWorthSnapshotService.getHistory(m);
+    }
+
+    @McpTool(
+            name = "suggest_category_for_merchant",
+            description = """
+                    Suggests expense account(s) to use when logging a transaction for a given merchant.
+                    Based on how previous transactions for this merchant were categorized.
+
+                    Returns top suggestions ranked by confidence (% of past uses).
+                    Useful for building auto-categorization or quickly picking the right account.
+
+                    Example: suggest_category_for_merchant(merchant="ZOMATO")
+                    → Food & Dining: 90% confidence (9/10 past transactions)
+                    """,
+            annotations = @McpTool.McpAnnotations(readOnlyHint = true)
+    )
+    public MerchantCategorySuggestionDto suggestCategoryForMerchant(
+            @McpArg(name = "merchant", description = "Merchant name to look up (case-insensitive)", required = true) String merchant
+    ) {
+        return reportingService.suggestCategoryForMerchant(merchant);
+    }
+
+    @McpTool(
+            name = "get_financial_health_score",
+            description = """
+                    Computes a 0–100 financial health score with letter grade (A/B/C/D/F).
+                    Based on the last 3 months of data.
+
+                    Three components (each scored independently):
+                      emergencyFund  — months of expenses covered by cash+banks (max 40 pts)
+                                       CRITICAL(<1m) | LOW(1-3m) | ADEQUATE(3-6m) | STRONG(>6m)
+                      savingsRate    — (income − expenses) ÷ income % (max 35 pts)
+                                       LOW(<10%) | MODERATE(10-20%) | GOOD(20-30%) | EXCELLENT(>30%)
+                      debtBurden     — monthly EMIs ÷ monthly income % (max 25 pts)
+                                       HEALTHY(<35%) | MODERATE(35-50%) | HIGH(>50%)
+
+                    Also returns personalised recommendations.
+                    """,
+            annotations = @McpTool.McpAnnotations(readOnlyHint = true)
+    )
+    public FinancialHealthDto getFinancialHealthScore() {
+        return reportingService.getFinancialHealthScore();
     }
 }

@@ -9,6 +9,9 @@ import com.moksh.walletwizzard.reporting.dto.MonthlyTrendDto;
 import com.moksh.walletwizzard.reporting.dto.LiquidNetWorthDto;
 import com.moksh.walletwizzard.reporting.dto.NetWorthDto;
 import com.moksh.walletwizzard.reporting.dto.SpendingAverageDto;
+import com.moksh.walletwizzard.reporting.dto.CashFlowProjectionDto;
+import com.moksh.walletwizzard.reporting.dto.FinancialHealthDto;
+import com.moksh.walletwizzard.reporting.dto.MerchantCategorySuggestionDto;
 import com.moksh.walletwizzard.reporting.dto.SpendingByCategoryDto;
 import com.moksh.walletwizzard.reporting.dto.SpendingByMerchantDto;
 import jakarta.persistence.EntityManager;
@@ -17,11 +20,13 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.math.MathContext;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 /**
@@ -523,6 +528,265 @@ public class ReportingService {
                         AccountType.valueOf((String) r[2]),
                         decimal(r[3])))
                 .toList();
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Cash Flow Projection
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /**
+     * Projects month-by-month cash balance based on current bank balance,
+     * upcoming recurring transactions, and scheduled loan installments.
+     */
+    public CashFlowProjectionDto getCashFlowProjection(int months) {
+        // Current liquid balance (banks + cash wallets only)
+        String balSql = """
+                SELECT COALESCE(SUM(
+                    CASE WHEN jel.side = a.normal_balance THEN jel.amount ELSE -jel.amount END
+                ), 0)
+                FROM journal_entry_lines jel
+                JOIN accounts a ON jel.account_id = a.id
+                WHERE a.sub_type IN ('BANK_ACCOUNT','CASH_AND_WALLET')
+                  AND a.is_active = true
+                """;
+        BigDecimal currentBalance = decimal(em.createNativeQuery(balSql).getSingleResult());
+
+        // Upcoming recurring transactions (ACTIVE, has nextBillingDate)
+        String recurSql = """
+                SELECT s.name, s.amount, s.side, s.next_billing_date, s.billing_cycle
+                FROM subscriptions s
+                WHERE s.status = 'ACTIVE'
+                  AND s.next_billing_date IS NOT NULL
+                ORDER BY s.next_billing_date
+                """;
+        @SuppressWarnings("unchecked")
+        List<Object[]> recurRows = em.createNativeQuery(recurSql).getResultList();
+
+        // Upcoming scheduled installments with auto-pay configured
+        String instSql = """
+                SELECT l.name, li.total_amount, li.due_date
+                FROM loan_installments li
+                JOIN loans l ON l.id = li.loan_id
+                WHERE li.status IN ('SCHEDULED','DUE')
+                  AND l.default_bank_account_id IS NOT NULL
+                  AND li.due_date >= CURRENT_DATE
+                ORDER BY li.due_date
+                """;
+        @SuppressWarnings("unchecked")
+        List<Object[]> instRows = em.createNativeQuery(instSql).getResultList();
+
+        LocalDate today = LocalDate.now();
+        List<CashFlowProjectionDto.MonthProjection> projections = new ArrayList<>(months);
+        BigDecimal runningBalance = currentBalance;
+
+        for (int i = 0; i < months; i++) {
+            YearMonth ym = YearMonth.now().plusMonths(i);
+            LocalDate monthStart = ym.atDay(1);
+            LocalDate monthEnd = ym.atEndOfMonth();
+
+            BigDecimal inflows = BigDecimal.ZERO;
+            BigDecimal outflows = BigDecimal.ZERO;
+            List<String> inflowItems = new ArrayList<>();
+            List<String> outflowItems = new ArrayList<>();
+
+            for (Object[] row : recurRows) {
+                String name = (String) row[0];
+                BigDecimal amount = decimal(row[1]);
+                String side = (String) row[2];
+                LocalDate nextDate = ((java.sql.Date) row[3]).toLocalDate();
+
+                // Estimate how many times this recurs in the month
+                if (!nextDate.isAfter(monthEnd) && !nextDate.isBefore(monthStart)) {
+                    if ("DEBIT".equals(side)) {
+                        outflows = outflows.add(amount);
+                        outflowItems.add(name + " -₹" + amount.setScale(0, RoundingMode.HALF_UP));
+                    } else {
+                        inflows = inflows.add(amount);
+                        inflowItems.add(name + " +₹" + amount.setScale(0, RoundingMode.HALF_UP));
+                    }
+                }
+            }
+
+            for (Object[] row : instRows) {
+                String loanName = (String) row[0];
+                BigDecimal amount = decimal(row[1]);
+                LocalDate dueDate = ((java.sql.Date) row[2]).toLocalDate();
+                if (!dueDate.isBefore(monthStart) && !dueDate.isAfter(monthEnd)) {
+                    outflows = outflows.add(amount);
+                    outflowItems.add(loanName + " EMI -₹" + amount.setScale(0, RoundingMode.HALF_UP));
+                }
+            }
+
+            BigDecimal closingBalance = runningBalance.add(inflows).subtract(outflows);
+            projections.add(new CashFlowProjectionDto.MonthProjection(
+                    ym.toString(), runningBalance, inflows, outflows,
+                    closingBalance, inflowItems, outflowItems));
+            runningBalance = closingBalance;
+        }
+
+        return new CashFlowProjectionDto(currentBalance, projections);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Merchant Category Suggestion
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /**
+     * Returns the top expense accounts used for a given merchant, ordered by frequency.
+     * Useful for auto-suggesting the category when logging a new transaction.
+     */
+    public MerchantCategorySuggestionDto suggestCategoryForMerchant(String merchant) {
+        String sql = """
+                SELECT
+                    a.id::text AS account_id,
+                    a.name     AS account_name,
+                    COUNT(*)   AS use_count
+                FROM journal_entries je
+                JOIN journal_entry_lines jel ON jel.journal_entry_id = je.id
+                JOIN accounts a ON jel.account_id = a.id
+                WHERE UPPER(je.merchant) = UPPER(:merchant)
+                  AND a.type = 'EXPENSE'
+                  AND jel.side = a.normal_balance
+                GROUP BY a.id, a.name
+                ORDER BY use_count DESC
+                LIMIT 5
+                """;
+
+        @SuppressWarnings("unchecked")
+        List<Object[]> rows = em.createNativeQuery(sql)
+                .setParameter("merchant", merchant)
+                .getResultList();
+
+        int total = rows.stream().mapToInt(r -> ((Number) r[2]).intValue()).sum();
+
+        List<MerchantCategorySuggestionDto.Suggestion> suggestions = rows.stream()
+                .map(r -> new MerchantCategorySuggestionDto.Suggestion(
+                        UUID.fromString((String) r[0]),
+                        (String) r[1],
+                        ((Number) r[2]).intValue(),
+                        total == 0 ? 0.0 : Math.round(((Number) r[2]).doubleValue() * 1000.0 / total) / 10.0
+                ))
+                .toList();
+
+        return new MerchantCategorySuggestionDto(merchant, suggestions);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Financial Health Score
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /**
+     * Computes a 0–100 financial health score based on emergency fund coverage,
+     * savings rate, and debt-to-income ratio using the last 3 months of data.
+     */
+    public FinancialHealthDto getFinancialHealthScore() {
+        LocalDate today = LocalDate.now();
+        LocalDate threeMonthsAgo = today.minusMonths(3);
+
+        // Cash + banks
+        String cashSql = """
+                SELECT COALESCE(SUM(
+                    CASE WHEN jel.side = a.normal_balance THEN jel.amount ELSE -jel.amount END
+                ), 0)
+                FROM journal_entry_lines jel
+                JOIN accounts a ON jel.account_id = a.id
+                WHERE a.sub_type IN ('BANK_ACCOUNT','CASH_AND_WALLET')
+                  AND a.is_active = true
+                """;
+        BigDecimal cashAndBanks = decimal(em.createNativeQuery(cashSql).getSingleResult());
+
+        // Average monthly income (last 3 months)
+        String incomeSql = """
+                SELECT COALESCE(SUM(
+                    CASE WHEN jel.side = a.normal_balance THEN jel.amount ELSE -jel.amount END
+                ), 0) / 3.0
+                FROM journal_entry_lines jel
+                JOIN accounts a ON jel.account_id = a.id
+                JOIN journal_entries je ON jel.journal_entry_id = je.id
+                WHERE a.type = 'INCOME'
+                  AND je.date >= :from
+                """;
+        BigDecimal monthlyIncome = decimal(em.createNativeQuery(incomeSql)
+                .setParameter("from", threeMonthsAgo).getSingleResult())
+                .setScale(2, RoundingMode.HALF_UP);
+
+        // Average monthly expenses (last 3 months)
+        String expSql = """
+                SELECT COALESCE(SUM(
+                    CASE WHEN jel.side = a.normal_balance THEN jel.amount ELSE -jel.amount END
+                ), 0) / 3.0
+                FROM journal_entry_lines jel
+                JOIN accounts a ON jel.account_id = a.id
+                JOIN journal_entries je ON jel.journal_entry_id = je.id
+                WHERE a.type = 'EXPENSE'
+                  AND je.date >= :from
+                """;
+        BigDecimal monthlyExpenses = decimal(em.createNativeQuery(expSql)
+                .setParameter("from", threeMonthsAgo).getSingleResult())
+                .setScale(2, RoundingMode.HALF_UP);
+
+        // Monthly EMI total (scheduled installments per month)
+        String emiSql = """
+                SELECT COALESCE(SUM(li.total_amount), 0) / NULLIF(COUNT(DISTINCT DATE_TRUNC('month', li.due_date)), 0)
+                FROM loan_installments li
+                JOIN loans l ON l.id = li.loan_id
+                WHERE li.status = 'PAID'
+                  AND li.paid_date >= :from
+                  AND l.direction = 'TAKEN'
+                """;
+        BigDecimal monthlyEmi = decimal(em.createNativeQuery(emiSql)
+                .setParameter("from", threeMonthsAgo).getSingleResult())
+                .setScale(2, RoundingMode.HALF_UP);
+
+        // Emergency fund: months of expenses covered
+        double monthsCovered = monthlyExpenses.compareTo(BigDecimal.ZERO) == 0 ? 99.0
+                : cashAndBanks.divide(monthlyExpenses, 2, RoundingMode.HALF_UP).doubleValue();
+        String efStatus = monthsCovered < 1 ? "CRITICAL" : monthsCovered < 3 ? "LOW"
+                : monthsCovered < 6 ? "ADEQUATE" : "STRONG";
+        int efScore = (int) Math.min(monthsCovered / 6.0 * 40, 40); // max 40 pts
+
+        // Savings rate
+        double savingsRate = monthlyIncome.compareTo(BigDecimal.ZERO) == 0 ? 0.0
+                : monthlyIncome.subtract(monthlyExpenses)
+                        .divide(monthlyIncome, 4, RoundingMode.HALF_UP)
+                        .multiply(BigDecimal.valueOf(100)).doubleValue();
+        String srStatus = savingsRate < 10 ? "LOW" : savingsRate < 20 ? "MODERATE"
+                : savingsRate < 30 ? "GOOD" : "EXCELLENT";
+        int srScore = (int) Math.min(savingsRate / 30.0 * 35, 35); // max 35 pts
+
+        // Debt-to-income
+        double dti = monthlyIncome.compareTo(BigDecimal.ZERO) == 0 ? 100.0
+                : monthlyEmi.divide(monthlyIncome, 4, RoundingMode.HALF_UP)
+                        .multiply(BigDecimal.valueOf(100)).doubleValue();
+        String dtiStatus = dti < 35 ? "HEALTHY" : dti < 50 ? "MODERATE" : "HIGH";
+        int dtiScore = (int) Math.max(25 - (dti / 50.0 * 25), 0); // max 25 pts
+
+        int overallScore = Math.min(efScore + srScore + dtiScore, 100);
+        String grade = overallScore >= 80 ? "A" : overallScore >= 65 ? "B"
+                : overallScore >= 50 ? "C" : overallScore >= 35 ? "D" : "F";
+
+        List<String> recommendations = new ArrayList<>();
+        if ("CRITICAL".equals(efStatus) || "LOW".equals(efStatus)) {
+            recommendations.add("Build emergency fund to at least 3 months of expenses (target: ₹"
+                    + monthlyExpenses.multiply(BigDecimal.valueOf(3)).setScale(0, RoundingMode.HALF_UP) + ")");
+        }
+        if ("LOW".equals(srStatus)) {
+            recommendations.add("Increase savings rate — currently " + String.format("%.1f", savingsRate) + "%, target ≥20%");
+        }
+        if ("HIGH".equals(dtiStatus)) {
+            recommendations.add("EMI burden is " + String.format("%.1f", dti) + "% of income — consider prepaying high-interest loans");
+        }
+        if (recommendations.isEmpty()) {
+            recommendations.add("Finances look healthy — consider investing surplus for long-term wealth building");
+        }
+
+        return new FinancialHealthDto(
+                overallScore, grade,
+                new FinancialHealthDto.EmergencyFund(cashAndBanks, monthlyExpenses, monthsCovered, efStatus),
+                new FinancialHealthDto.SavingsRate(monthlyIncome, monthlyExpenses, savingsRate, srStatus),
+                new FinancialHealthDto.DebtBurden(monthlyEmi, monthlyIncome, dti, dtiStatus),
+                recommendations
+        );
     }
 
     // ─────────────────────────────────────────────────────────────────────────

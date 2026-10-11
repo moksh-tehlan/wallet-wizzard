@@ -64,4 +64,20 @@ public interface AccountRepository extends JpaRepository<Account, UUID> {
             """, nativeQuery = true)
     BigDecimal computeBalanceAsOf(@Param("accountId") UUID accountId,
                                   @Param("asOfDate") LocalDate asOfDate);
+
+    @Query(value = """
+            SELECT COALESCE(SUM(
+                CASE WHEN jel.side = a.normal_balance THEN jel.amount ELSE -jel.amount END
+            ), 0)
+            FROM journal_entry_lines jel
+            JOIN accounts a ON jel.account_id = a.id
+            JOIN journal_entries je ON jel.journal_entry_id = je.id
+            WHERE jel.account_id = :accountId
+              AND a.type = 'EXPENSE'
+              AND je.date >= :from
+              AND je.date <= :to
+            """, nativeQuery = true)
+    BigDecimal computeSpendForPeriod(@Param("accountId") UUID accountId,
+                                     @Param("from") LocalDate from,
+                                     @Param("to") LocalDate to);
 }
