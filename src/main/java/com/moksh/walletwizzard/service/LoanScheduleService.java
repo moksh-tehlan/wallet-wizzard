@@ -184,6 +184,7 @@ public class LoanScheduleService {
         return participantRepository.save(participant);
     }
 
+    @Transactional
     public LoanParticipant addParticipant(UUID loanId, UUID personId, BigDecimal sharePercent, String notes) {
         Loan loan = requireLoan(loanId);
         Person person = personService.getById(personId);
